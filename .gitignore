@@ -1,0 +1,21 @@
+# Python 编译缓存
+__pycache__/
+*.pyc
+
+
+# 其他临时文件
+*.log
+# Ignore caches, models, and audio files
+__pycache__/
+.pytest_cache/
+*.pt
+*.pth
+*.h5
+*.onnx
+*.wav
+ml_uav_comb/cache/
+ml_uav_comb/artifacts/
+*.npz
+*.npy
+*.log
+
