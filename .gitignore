@@ -1,21 +1,42 @@
 # Python 编译缓存
 __pycache__/
 *.pyc
+.pytest_cache/
 
 
 # 其他临时文件
 *.log
-# Ignore caches, models, and audio files
-__pycache__/
-.pytest_cache/
-*.pt
-*.pth
-*.h5
-*.onnx
-*.wav
-ml_uav_comb/cache/
-ml_uav_comb/artifacts/
+training_log*.txt
+*.zip
+*.tar
+*.gz
+
+# 生成的特征与缓存
 *.npz
 *.npy
-*.log
+ml_uav_comb/cache/
 
+# 训练产物
+*.pt
+*.pth
+*.ckpt
+ml_uav_comb/artifacts/
+
+# 本地数据与导出文件
+*.wav
+*.mp3
+*.flac
+*.csv
+*.parquet
+*.pkl
+*.pickle
+*.joblib
+*.h5
+*.hdf5
+*.mat
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.tif
+*.tiff
