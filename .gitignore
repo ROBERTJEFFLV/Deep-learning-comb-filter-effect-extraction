@@ -1,7 +1,20 @@
 # Python 编译缓存
 __pycache__/
 *.pyc
+.pytest_cache/
 
 
 # 其他临时文件
 *.log
+training_log*.txt
+
+# 生成的特征与缓存
+*.npz
+*.npy
+ml_uav_comb/cache/
+
+# 训练产物
+*.pt
+*.pth
+*.ckpt
+ml_uav_comb/artifacts/

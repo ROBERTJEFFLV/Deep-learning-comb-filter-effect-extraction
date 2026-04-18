@@ -11,8 +11,8 @@ WS_MAGIC = 0xA55A1234
 WS_HEADER_FMT = "<IIII"  # magic, frame_id, ts_ms, payload_len
 WS_HEADER_SIZE = struct.calcsize(WS_HEADER_FMT)
 
-MAX_AGE_MS = 500
-MAX_BUFFER_SECONDS = 0.5
+MAX_AGE_MS = 2000
+MAX_BUFFER_SECONDS = 2
 CHANNELS = 1
 MAX_BUFFER_SAMPLES = int(SR * CHANNELS * MAX_BUFFER_SECONDS)
 
@@ -115,12 +115,12 @@ class WSClient:
 
                     self._total_frames_received += 1
 
-                    if age_ms > MAX_AGE_MS:
-                        # 太老的帧直接丢掉，不进入缓冲区
-                        self._total_frames_dropped += 1
-                        if self._total_frames_received % 100 == 0:  # 每100帧打印一次
-                            print(f"[WSClient] 丢弃过老帧 frame_id={frame_id}, age={age_ms}ms (已丢弃{self._total_frames_dropped}帧)")
-                        continue
+                    # if age_ms > MAX_AGE_MS:
+                    #     # 太老的帧直接丢掉，不进入缓冲区
+                    #     self._total_frames_dropped += 1
+                    #     if self._total_frames_received % 100 == 0:  # 每100帧打印一次
+                    #         print(f"[WSClient] 丢弃过老帧 frame_id={frame_id}, age={age_ms}ms (已丢弃{self._total_frames_dropped}帧)")
+                    #     continue
 
                     # 4) payload → int16 样本（小端）
                     # 注意：发送端是 np.int16.tobytes()，所以这里用 "<i2" 解码

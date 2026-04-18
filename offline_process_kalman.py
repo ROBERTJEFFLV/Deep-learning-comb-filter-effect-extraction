@@ -187,10 +187,10 @@ def evaluate_against_reference(
 BASE_DIR = Path(__file__).resolve().parent
 INLINE_RUN = {
     # 输入：单个 .wav 文件路径
-    "input": str(BASE_DIR / "rec_1.wav"),
+    "input": str(BASE_DIR / "recorded_audio.wav"),
 
     # 输出 CSV 路径；为空则默认写到当前目录 offline_results.csv
-    "output": str(BASE_DIR / "sine_fit_log.csv"),
+    "output": str(BASE_DIR / "sine_fit_log_recorded.csv"),
 }
 
 

@@ -1,0 +1,484 @@
+experiment:
+  name: uav_comb_omega_copy_test_real_test
+  seed: 7
+audio:
+  target_sr: 48000
+  n_fft: 512
+  hop_len: 128
+  freq_min: 1000
+  freq_max: 5000
+  max_duration_sec: null
+front_end:
+  history_frames: 18
+  smooth_sigma_1: 2.2
+  smooth_sigma_2: 30.0
+  noise_gate_smooth: 0.9
+observability:
+  center_frequency_hz: 3000.0
+  score_threshold: 1.0
+  soft_target_lower: 0.8
+  soft_target_upper: 1.2
+dataset:
+  build_jobs: 4
+  dynamic_epoch_split: false
+  dynamic_epoch_split_ratio:
+  - 5
+  - 1
+  - 1
+  cache_dir: ml_uav_comb/cache/omega_copy_test_real_test
+  index_path: ml_uav_comb/cache/omega_copy_test_real_test/dataset_index.json
+  normalization_path: ml_uav_comb/cache/omega_copy_test_real_test/normalization_stats.npz
+  meta_path: ml_uav_comb/cache/omega_copy_test_real_test/dataset_index_meta.json
+  recordings:
+  - recording_id: test_test_00001
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260316_183937__seg001__t0017.88_0197.51.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260316_183937__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00002
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260316_184454__seg001__t0022.03_0224.33.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260316_184454__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00003
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_081917__seg001__t0024.07_0210.46.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_081917__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00004
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_082723__seg001__t0016.59_0217.70.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_082723__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00005
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_083524__seg001__t0017.61_0205.12.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_083524__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00006
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_084338__seg001__t0016.80_0216.31.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_084338__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00007
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_085247__seg001__t0017.93_0102.35.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_085247__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00008
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_090650__seg001__t0023.87_0265.08.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_090650__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00009
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_091314__seg001__t0017.90_0153.30.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_091314__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00010
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_091910__seg001__t0017.57_0210.20.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/3_prop_90_deg_uav_20260317_091910__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00011
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_190857__seg001__t0016.93_0186.29.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_190857__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00012
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_191346__seg001__t0017.50_0204.01.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_191346__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00013
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_193555__seg001__t0022.15_0033.09.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_193555__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00014
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_193555__seg002__t0034.00_0058.21.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_193555__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00015
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_193555__seg003__t0060.93_0231.12.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_193555__seg003.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00016
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_194321__seg001__t0022.48_0191.37.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_194321__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00017
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_205817__seg001__t0024.47_0234.04.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_205817__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00018
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_210338__seg001__t0017.21_0191.84.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_210338__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00019
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_211211__seg001__t0021.84_0212.08.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_211211__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00020
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_211211__seg002__t0212.99_0226.62.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_211211__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00021
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_211916__seg001__t0017.01_0191.10.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_211916__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00022
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_211916__seg002__t0192.01_0206.65.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260310_211916__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00023
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260311_110608__seg001__t0016.92_0067.73.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260311_110608__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00024
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260311_110608__seg002__t0068.63_0218.68.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260311_110608__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00025
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260311_111441__seg001__t0016.79_0209.94.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/70_deg_uav_20260311_111441__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00026
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_134838__seg001__t0023.96_0149.27.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_134838__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00027
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_134838__seg002__t0150.18_0212.37.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_134838__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00028
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_135344__seg001__t0016.84_0194.67.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_135344__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00029
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_182927__seg001__t0023.91_0206.25.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_182927__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00030
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_182927__seg002__t0206.88_0222.49.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_182927__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00031
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_183529__seg001__t0017.43_0205.37.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_183529__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00032
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_184451__seg001__t0016.91_0172.91.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_184451__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00033
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_185246__seg001__t0024.35_0064.16.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_185246__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00034
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_185246__seg002__t0065.06_0216.92.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_185246__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00035
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_185941__seg001__t0017.50_0096.12.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_185941__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00036
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_185941__seg002__t0097.07_0111.90.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_185941__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00037
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_185941__seg003__t0112.81_0139.79.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_185941__seg003.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00038
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_194231__seg001__t0024.13_0223.62.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_194231__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00039
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_195211__seg001__t0016.99_0216.22.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_195211__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00040
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_195211__seg002__t0216.72_0299.12.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_195211__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00041
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_195859__seg001__t0017.20_0196.21.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/80_deg_uav_20260311_195859__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00042
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (1)__seg001__t0005.00_0016.89.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (1)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00043
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (1)__seg002__t0017.83_0091.67.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (1)__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00044
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (2)__seg001__t0005.00_0060.36.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (2)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00045
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (2)__seg002__t0061.27_0158.89.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (2)__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00046
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (3)__seg001__t0021.16_0254.81.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (3)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00047
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (4)__seg001__t0016.03_0133.75.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (4)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00048
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (5)__seg001__t0024.96_0103.08.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (5)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00049
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (6)__seg001__t0020.25_0082.20.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (6)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00050
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (7)__seg001__t0005.00_0063.32.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (7)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00051
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (7)__seg002__t0065.49_0089.20.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (7)__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00052
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (7)__seg003__t0090.13_0099.10.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (7)__seg003.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00053
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (8)__seg001__t0016.07_0128.88.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (8)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00054
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (8)__seg002__t0129.79_0150.70.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (8)__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00055
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (9)__seg001__t0016.23_0058.94.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (9)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00056
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (9)__seg002__t0059.87_0144.83.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/moving_moving
+      (9)__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00057
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (1)__seg001__t0014.64_0092.92.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (1)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00058
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (10)__seg001__t0014.44_0099.50.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (10)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00059
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (2)__seg001__t0014.86_0105.30.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (2)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00060
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (3)__seg001__t0015.57_0097.47.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (3)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00061
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (4)__seg001__t0015.53_0085.63.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (4)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00062
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (5)__seg001__t0014.73_0027.32.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (5)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00063
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (5)__seg002__t0027.90_0092.37.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (5)__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00064
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (6)__seg001__t0015.69_0094.23.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (6)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00065
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (7)__seg001__t0014.51_0083.49.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (7)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00066
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (8)__seg001__t0020.90_0121.61.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (8)__seg001.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00067
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (8)__seg002__t0122.18_0125.72.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (8)__seg002.csv
+    label_format: csv
+    split_hint: test
+  - recording_id: test_test_00068
+    audio_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (9)__seg001__t0020.56_0112.28.wav
+    label_path: /home/lvmingyang/March24/datasets/simulation/original_sound/copy_test_real/test_dataset/static_static
+      (9)__seg001.csv
+    label_format: csv
+    split_hint: test
+  window_frames: 68
+  stride_frames: 1
+  split_margin_sec: 0.1813333333
+  split_ratio_single:
+  - 0.7
+  - 0.15
+  - 0.15
+  split_names:
+  - train
+  - val
+  - test
+  normalization_split: all
+model:
+  distance_cm_min: 1.0
+  distance_cm_max: 339.092
+  encoder_channels:
+  - 32
+  - 64
+  - 128
+  regression_hidden: 128
+  frequency_coord_mode: standardized
+  frequency_pool_hidden: 64
+training:
+  sequence_length: 16
+  eval_sequence_length: 32
+  chunk_step: 16
+  eval_chunk_step: 32
+  batch_size: 16
+  eval_batch_size: 16
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+  prefetch_factor: 2
+  non_blocking_to_device: true
+  max_cache_files_per_worker: 2
+  drop_last_train_batch: true
+  log_interval_steps: 20
+  use_amp: true
+  amp_dtype: auto
+  use_compile: true
+  compile_mode: reduce-overhead
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  epochs: 30
+  grad_clip_norm: 5.0
+  omega_huber_delta: 0.0005495497353218297
+  delta_omega_huber_delta: 0.00018318324510727655
+  acc_omega_huber_delta: 9.159162255363828e-05
+  lambda_omega: 1.0
+  lambda_delta: 0.2
+  lambda_acc: 0.05
+  lambda_pattern: 1.0
+  checkpoint_dir: ml_uav_comb/artifacts/omega_copy_test_real_test
+evaluation:
+  prediction_csv: ml_uav_comb/artifacts/omega_copy_test_real_test/eval_predictions.csv
+inference:
+  prediction_csv: ml_uav_comb/artifacts/omega_copy_test_real_test/infer_predictions.csv
+  pattern_threshold: 0.5

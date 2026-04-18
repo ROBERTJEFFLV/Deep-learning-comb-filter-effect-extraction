@@ -95,9 +95,23 @@ def detect_comb_direction(
     if abs(rho) < rho_thresh or lag == 0:
         return "None", zeros
 
-    # 约定：lag>0 → frame2 向右（高频）→ "Right"；lag<0 → "Left"
+    # 兼容旧接口：当前返回值保持既有 "Left"/"Right" 命名，不在此处改动语义，
+    # 以免影响现有实时链路。v2 学习子系统请改用 lag_to_shift_direction()。
     direction = "Left" if lag > 0 else "Right"
     return direction, zeros
+
+
+def lag_to_shift_direction(lag: int, rho: float, rho_thresh: float = 0.6) -> str:
+    """Map lag sign to an unambiguous frequency-shift label.
+
+    Returns one of:
+      - "shift_up_freq"   : newer frame shifts toward higher frequency bins
+      - "shift_down_freq" : newer frame shifts toward lower frequency bins
+      - "shift_none"      : unreliable or zero lag
+    """
+    if abs(rho) < rho_thresh or lag == 0:
+        return "shift_none"
+    return "shift_up_freq" if lag > 0 else "shift_down_freq"
 
 
 def average_zero_crossing_freq_spacing(

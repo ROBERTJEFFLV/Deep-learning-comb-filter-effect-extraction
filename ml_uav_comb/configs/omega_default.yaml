@@ -1,0 +1,90 @@
+experiment:
+  name: uav_comb_omega_default
+  seed: 7
+
+audio:
+  target_sr: 48000
+  n_fft: 512
+  hop_len: 128
+  freq_min: 1000
+  freq_max: 5000
+  max_duration_sec: null
+
+front_end:
+  history_frames: 18
+  smooth_sigma_1: 2.2
+  smooth_sigma_2: 30.0
+  noise_gate_smooth: 0.9
+
+observability:
+  center_frequency_hz: 3000.0
+  score_threshold: 1.0
+  soft_target_lower: 0.8
+  soft_target_upper: 1.2
+
+dataset:
+  build_jobs: 4
+  dynamic_epoch_split: false
+  dynamic_epoch_split_ratio: [5, 1, 1]
+  cache_dir: ml_uav_comb/cache/omega_default
+  index_path: ml_uav_comb/cache/omega_default/dataset_index.json
+  normalization_path: ml_uav_comb/cache/omega_default/normalization_stats.npz
+  meta_path: ml_uav_comb/cache/omega_default/dataset_index_meta.json
+  recordings:
+    - recording_id: rec_1
+      audio_path: rec_1.wav
+      label_path: range_1.csv
+      label_format: csv
+      split_hint: auto
+  window_frames: 68
+  stride_frames: 1
+  split_margin_sec: 0.1813333333
+  split_ratio_single: [0.7, 0.15, 0.15]
+  split_names: [train, val, test]
+
+model:
+  distance_cm_min: 5.0
+  distance_cm_max: 60.0
+  encoder_channels: [32, 64, 128]
+  regression_hidden: 128
+  frequency_coord_mode: standardized
+  frequency_pool_hidden: 64
+
+training:
+  sequence_length: 16
+  eval_sequence_length: 32
+  chunk_step: 16
+  eval_chunk_step: 32
+  batch_size: 16
+  eval_batch_size: 16
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+  prefetch_factor: 2
+  non_blocking_to_device: true
+  max_cache_files_per_worker: 2
+  drop_last_train_batch: true
+  log_interval_steps: 20
+  use_amp: true
+  amp_dtype: auto
+  use_compile: true
+  compile_mode: reduce-overhead
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  epochs: 30
+  grad_clip_norm: 5.0
+  omega_huber_delta: 0.0005495497353218297
+  delta_omega_huber_delta: 0.00018318324510727655
+  acc_omega_huber_delta: 0.00009159162255363828
+  lambda_omega: 1.0
+  lambda_delta: 0.2
+  lambda_acc: 0.05
+  lambda_pattern: 1.0
+  checkpoint_dir: ml_uav_comb/artifacts/omega_default
+
+evaluation:
+  prediction_csv: ml_uav_comb/artifacts/omega_default/eval_predictions.csv
+
+inference:
+  prediction_csv: ml_uav_comb/artifacts/omega_default/infer_predictions.csv
+  pattern_threshold: 0.5
