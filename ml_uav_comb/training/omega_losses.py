@@ -23,15 +23,27 @@ def weighted_huber(pred: torch.Tensor, target: torch.Tensor, weights: torch.Tens
     valid = torch.isfinite(pred) & torch.isfinite(target) & (weights > 0.0)
     if not bool(valid.any()):
         return pred.sum() * 0.0
-    loss = F.huber_loss(pred[valid], target[valid], reduction="none", delta=float(delta))
+    # Use smooth_l1_loss (beta param) instead of huber_loss (delta param).
+    # PyTorch huber_loss scales the linear regime by delta, making loss ≈ delta*|err|.
+    # smooth_l1_loss does NOT scale: linear regime is |err| - 0.5*beta.
+    # With omega's tiny delta (~5.5e-4), huber gave loss ~1e-6 vs pattern BCE ~0.02.
+    loss = F.smooth_l1_loss(pred[valid], target[valid], reduction="none", beta=float(delta))
     return (loss * weights[valid]).sum() / torch.clamp(weights[valid].sum(), min=1e-6)
 
 
-def weighted_bce_with_logits(logits: torch.Tensor, target: torch.Tensor, weights: torch.Tensor) -> torch.Tensor:
+def weighted_bce_with_logits(
+    logits: torch.Tensor,
+    target: torch.Tensor,
+    weights: torch.Tensor,
+    pos_weight: float = 1.0,
+) -> torch.Tensor:
     valid = torch.isfinite(logits) & torch.isfinite(target) & (weights > 0.0)
     if not bool(valid.any()):
         return logits.sum() * 0.0
-    loss = F.binary_cross_entropy_with_logits(logits[valid], target[valid], reduction="none")
+    pw = logits.new_tensor([float(pos_weight)]) if pos_weight != 1.0 else None
+    loss = F.binary_cross_entropy_with_logits(
+        logits[valid], target[valid], reduction="none", pos_weight=pw,
+    )
     return (loss * weights[valid]).sum() / torch.clamp(weights[valid].sum(), min=1e-6)
 
 
@@ -113,8 +125,9 @@ def combined_omega_loss(model_out: Dict[str, torch.Tensor], batch: Dict[str, tor
     delta_lambda = float(cfg["training"].get("lambda_delta", 0.2))
     acc_lambda = float(cfg["training"].get("lambda_acc", 0.05))
     pattern_lambda = float(cfg["training"].get("lambda_pattern", 1.0))
+    pattern_pos_weight = float(cfg["training"].get("pattern_pos_weight", 1.0))
     dynamic_loss = delta_lambda * delta_omega_loss + acc_lambda * acc_omega_loss
-    pattern_loss = weighted_bce_with_logits(pattern_logit, pattern_target, pattern_weights)
+    pattern_loss = weighted_bce_with_logits(pattern_logit, pattern_target, pattern_weights, pos_weight=pattern_pos_weight)
     total = pattern_lambda * pattern_loss + omega_lambda * omega_loss + dynamic_loss
     return {
         "loss_total": total,

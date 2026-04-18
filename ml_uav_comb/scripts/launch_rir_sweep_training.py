@@ -119,6 +119,18 @@ def _build_config(args) -> dict:
     cfg["training"]["log_interval_steps"] = 50
     cfg["training"]["use_compile"] = not args.no_compile
 
+    # Loss rebalancing: smooth_l1 replaces huber (see omega_losses.py),
+    # so omega_loss magnitude is now ~0.003 instead of ~1e-6.
+    # lambda_omega=7 brings omega contribution (~0.021) on par with pattern BCE (~0.02).
+    cfg["training"]["lambda_omega"] = 7.0
+    cfg["training"]["lambda_delta"] = 1.4
+    cfg["training"]["lambda_acc"] = 0.35
+    cfg["training"]["lambda_pattern"] = 1.0
+    # Pattern BCE pos_weight: synthetic data has ~96% positive rate.
+    # Down-weight positives to balance: (1 - 0.964) / 0.964 ≈ 0.037.
+    # This makes the effective contribution of positives and negatives equal.
+    cfg["training"]["pattern_pos_weight"] = 0.037
+
     cfg["evaluation"]["prediction_csv"] = os.path.join(
         CHECKPOINT_DIR, "eval_predictions.csv"
     )

@@ -7,6 +7,9 @@ __pycache__/
 # 其他临时文件
 *.log
 training_log*.txt
+*.zip
+*.tar
+*.gz
 
 # 生成的特征与缓存
 *.npz
@@ -18,3 +21,22 @@ ml_uav_comb/cache/
 *.pth
 *.ckpt
 ml_uav_comb/artifacts/
+
+# 本地数据与导出文件
+*.wav
+*.mp3
+*.flac
+*.csv
+*.parquet
+*.pkl
+*.pickle
+*.joblib
+*.h5
+*.hdf5
+*.mat
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.tif
+*.tiff
