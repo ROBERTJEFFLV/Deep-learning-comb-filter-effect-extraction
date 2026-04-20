@@ -10,7 +10,7 @@ audio:
   max_duration_sec: null
 front_end:
   dt_short_lag: 1
-  dt_long_lag: 9
+  dt_long_lag: 15
   history_frames: 18
   d1_amp_scale: 900.0
   sound_threshold: 0.005

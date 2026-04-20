@@ -84,12 +84,13 @@ class TestV2AudioProcessor(unittest.TestCase):
         frames = _run_v2_audio_processor(audio)
         self.assertGreater(len(frames), 5)
 
-        # 后半段帧（EMA 预热后）应有较高 SMD
+        # 后半段帧（EMA + diff 预热后）应有可检测的 SMD
+        # diff 管线的 SMD 量级低于原始 log 幅度谱，0.02 是合理下限
         late_frames = frames[len(frames) // 2:]
         smd_vals = [f['smd'] for f in late_frames]
         mean_smd = np.mean(smd_vals)
-        self.assertGreater(mean_smd, 0.5,
-                           f"合成梳状信号 SMD 均值 {mean_smd:.3f} 应 > 0.5")
+        self.assertGreater(mean_smd, 0.02,
+                           f"合成梳状信号 SMD 均值 {mean_smd:.3f} 应 > 0.02")
 
 
 if __name__ == "__main__":

@@ -31,11 +31,12 @@ from ml_uav_comb.features.feature_utils import (
 
 def _dataset_build_spec(cfg: Dict[str, Any]) -> Dict[str, Any]:
     return {
-        "feature_contract_version": 6,
+        "feature_contract_version": 7,
         "experiment": {"seed": int(cfg.get("experiment", {}).get("seed", 0))},
         "audio": cfg["audio"],
         "front_end": cfg.get("front_end", {}),
         "cepstral": cfg.get("cepstral", {}),
+        "preprocessing": cfg.get("preprocessing", {}),
         "observability": cfg.get("observability", {}),
         "dataset": {
             "recordings": cfg["dataset"]["recordings"],

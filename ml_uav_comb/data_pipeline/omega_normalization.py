@@ -9,8 +9,8 @@ import numpy as np
 from ml_uav_comb.data_pipeline.omega_dataset_index import open_omega_index_split
 from ml_uav_comb.features.feature_utils import TerminalProgressBar
 
-NORM_SCHEMA_VERSION = 4
-DYNAMIC_CHANNEL_KEYS = ("log_mag_band", "log_mag_band_dt1", "log_mag_band_dt_long", "log_mag_band_abs_dt1")
+NORM_SCHEMA_VERSION = 5
+DYNAMIC_CHANNEL_KEYS = ("log_mag_band", "log_mag_preprocessed", "log_mag_preprocessed_dt1", "log_mag_preprocessed_abs")
 
 
 def compute_omega_normalization_stats(
@@ -50,9 +50,9 @@ def compute_omega_normalization_stats(
         if cache_path not in cache_store:
             cache_store[cache_path] = dict(np.load(cache_path, allow_pickle=True))
             c = cache_store[cache_path]
-            version = int(np.asarray(c.get("schema_version", [6])).reshape(-1)[0])
-            if version not in (6,):
-                raise ValueError(f"expected omega cache schema_version 6, got {version} for {cache_path}")
+            version = int(np.asarray(c.get("schema_version", [7])).reshape(-1)[0])
+            if version not in (7,):
+                raise ValueError(f"expected omega cache schema_version 7, got {version} for {cache_path}")
             # Evict oldest entries to prevent OOM
             while len(cache_store) > MAX_NORM_CACHE_FILES:
                 oldest_key = next(iter(cache_store))

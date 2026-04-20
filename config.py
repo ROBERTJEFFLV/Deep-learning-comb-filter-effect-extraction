@@ -13,7 +13,9 @@ COMB_V2_FREQ_MIN = 800.0             # 分析频带下限 Hz
 COMB_V2_FREQ_MAX = 8000.0            # 分析频带上限 Hz
 COMB_V2_TAU_MIN = 0.00025            # 搜索延迟下限 s (d≈4.3 cm)
 COMB_V2_TAU_MAX = 0.004              # 搜索延迟上限 s (d≈68.6 cm)
-COMB_V2_EMA_ALPHA = 0.02             # 运行均值 EMA 系数
+COMB_V2_EMA_ALPHA = 0.1              # 时域 EMA 平滑系数 (压快变噪声)
+COMB_V2_DIFF_DT = 15                 # 差分帧间隔 (~0.32s, 提取慢变梳状滤波)
+COMB_V2_SPECTRAL_SIGMA = 5.0         # 差分后频谱高斯平滑 σ (消除尖峰)
 COMB_V2_CEP_AVG = 4                  # 倒谱滑动平均帧数
 COMB_V2_SMD_THRESHOLD = 0.871        # SMD 检测阈值 (TPR≈92%, FPR≈0%)
 

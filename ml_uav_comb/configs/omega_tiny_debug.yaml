@@ -12,8 +12,13 @@ audio:
 
 front_end:
   dt_short_lag: 1
-  dt_long_lag: 9
+  dt_long_lag: 15
   history_frames: 18
+
+preprocessing:
+  ema_alpha: 0.1
+  diff_dt: 15
+  spectral_sigma: 5.0
 
 cepstral:
   tau_min_s: 0.00025

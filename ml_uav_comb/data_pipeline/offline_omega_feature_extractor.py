@@ -3,10 +3,14 @@
 Replaces the legacy smooth_d1 extraction with log-magnitude-band features
 aligned with the v2 cepstral analysis pipeline (processing/comb_feature_v2.py).
 
-The primary ML channel is ``log_mag_band`` — the log-magnitude spectrum in the
-800–8000 Hz analysis band — which directly encodes the comb filter's periodic
-spectral modulation.  Temporal derivatives (dt1, dt_long, abs_dt1) are derived
-from this base channel, giving the model 4 input channels [C, T, F].
+Preprocessing pipeline:
+  raw log|Y(f)| → EMA(α) temporal smooth → diff(dt) → spectral_smooth(σ) → channels
+
+The primary ML channels are:
+  ch0: log_mag_band          — raw log magnitude (spectral context)
+  ch1: log_mag_preprocessed  — EMA→diff→smooth (THE comb filter signal)
+  ch2: log_mag_preprocessed_dt1   — short diff of ch1 (motion detection)
+  ch3: log_mag_preprocessed_abs   — abs(ch1) (unsigned comb energy)
 
 Additionally, per-frame cepstral scalar features (SMD, CPR, CPN) are stored as
 auxiliary data for potential multi-task learning or analysis.
@@ -17,6 +21,8 @@ import math
 from typing import Any, Dict, Optional
 
 import numpy as np
+from scipy.ndimage import gaussian_filter1d
+from scipy.signal import lfilter
 
 from ml_uav_comb.features.feature_utils import (
     interpolate_distance,
@@ -30,8 +36,8 @@ from ml_uav_comb.features.feature_utils import (
 )
 
 C_SPEED = 343.0
-OMEGA_CACHE_SCHEMA_VERSION = 6
-OMEGA_CACHE_SCHEMA_VERSION_COMPAT = (6,)
+OMEGA_CACHE_SCHEMA_VERSION = 7
+OMEGA_CACHE_SCHEMA_VERSION_COMPAT = (7,)
 
 
 def _temporal_difference(arr: np.ndarray, lag: int = 1) -> np.ndarray:
@@ -77,6 +83,7 @@ class OfflineOmegaFeatureExtractor:
         audio_cfg = cfg["audio"]
         front_cfg = cfg.get("front_end", {})
         observability_cfg = cfg.get("observability", {})
+        preproc_cfg = cfg.get("preprocessing", {})
 
         self.sr = int(audio_cfg["target_sr"])
         self.n_fft = int(audio_cfg["n_fft"])
@@ -91,7 +98,12 @@ class OfflineOmegaFeatureExtractor:
         self.tau_max_s = float(cep_cfg.get("tau_max_s", 0.004))
         self.cep_avg_frames = int(cep_cfg.get("cep_avg_frames", 4))
 
-        # Temporal difference lags
+        # Preprocessing: EMA → diff → spectral smooth
+        self.ema_alpha = float(preproc_cfg.get("ema_alpha", 0.1))
+        self.diff_dt = int(preproc_cfg.get("diff_dt", 15))
+        self.spectral_sigma = float(preproc_cfg.get("spectral_sigma", 5.0))
+
+        # Legacy temporal difference lags (kept for backward compat, unused by new pipeline)
         self.dt_short_lag = int(front_cfg.get("dt_short_lag", 1))
         self.dt_long_lag = int(front_cfg.get("dt_long_lag", 9))
 
@@ -242,14 +254,14 @@ class OfflineOmegaFeatureExtractor:
 
     def process_audio(self, audio: np.ndarray,
                       optional_labels: Optional[Dict[str, np.ndarray]] = None) -> Dict[str, Any]:
-        """Extract v2 cepstral features from an audio array.
+        """Extract v2 cepstral features with EMA→diff→smooth preprocessing.
 
         Returns a dict suitable for saving as .npz cache:
-        - log_mag_band [T, F] — log magnitude spectrum in the analysis band
-        - log_mag_band_dt1 [T, F] — short-term temporal difference
-        - log_mag_band_dt_long [T, F] — long-term temporal difference
-        - log_mag_band_abs_dt1 [T, F] — absolute short-term diff
-        - smd [T] — spectral modulation depth (per-frame scalar)
+        - log_mag_band [T, F] — raw log magnitude spectrum (spectral context)
+        - log_mag_preprocessed [T, F] — EMA→diff(dt)→smooth(σ) (comb signal)
+        - log_mag_preprocessed_dt1 [T, F] — short diff of preprocessed
+        - log_mag_preprocessed_abs [T, F] — abs of preprocessed
+        - smd [T] — spectral modulation depth (from preprocessed signal)
         - cpr [T] — cepstral peak ratio
         - cpn [T] — cepstral peak normalized
         - energy_proxy [T], snr_proxy [T] — auxiliary scalars
@@ -262,35 +274,54 @@ class OfflineOmegaFeatureExtractor:
         n_samples = int(audio.shape[0])
         n_frames = max(0, (n_samples - self.n_fft) // self.hop_len + 1)
 
-        log_mag_band_seq = np.zeros((n_frames, self.n_band), dtype=np.float32)
+        # ── Vectorized STFT ──────────────────────────────────────────
+        idx = (np.arange(n_frames) * self.hop_len)[:, None] + np.arange(self.n_fft)[None, :]
+        frames_raw = audio[idx]
+        windowed = frames_raw * self.window[None, :]
+        fft_vals = np.fft.rfft(windowed, axis=1)
+        mag_full = np.abs(fft_vals)
+        mag_band = mag_full[:, self.freq_idx].astype(np.float32)
+
+        # Raw log magnitude (ch0 — spectral context, always available)
+        log_mag_band_raw = np.log(mag_band + 1e-12).astype(np.float32)
+
+        # ── Preprocessing pipeline: EMA → diff → spectral_smooth ─────
+        lb = log_mag_band_raw.astype(np.float64)
+
+        # Step 1: EMA temporal smoothing (suppress fast-changing noise)
+        if self.ema_alpha > 0:
+            lb = lfilter([self.ema_alpha], [1, -(1 - self.ema_alpha)], lb, axis=0)
+
+        # Step 2: Temporal differencing (extract slow-varying comb changes)
+        dt = self.diff_dt
+        preprocessed = np.zeros_like(lb)
+        if dt > 0 and dt < n_frames:
+            preprocessed[dt:] = lb[dt:] - lb[:-dt]
+
+        # Step 3: Spectral Gaussian smoothing (smooth spiky diff residuals)
+        if self.spectral_sigma > 0:
+            preprocessed = gaussian_filter1d(preprocessed, sigma=self.spectral_sigma, axis=1)
+
+        log_mag_preprocessed = preprocessed.astype(np.float32)
+
+        # Derived channels from the preprocessed signal
+        log_mag_preprocessed_dt1 = _temporal_difference(log_mag_preprocessed, lag=1)
+        log_mag_preprocessed_abs = np.abs(log_mag_preprocessed).astype(np.float32)
+
+        # ── Per-frame scalars (SMD, CPR, CPN from preprocessed) ──────
         smd_seq = np.zeros(n_frames, dtype=np.float32)
         cpr_seq = np.zeros(n_frames, dtype=np.float32)
         cpn_seq = np.zeros(n_frames, dtype=np.float32)
         energy_proxy_seq = np.zeros(n_frames, dtype=np.float32)
         snr_proxy_seq = np.zeros(n_frames, dtype=np.float32)
-        frame_time_sec = np.zeros(n_frames, dtype=np.float32)
 
-        # Cepstrum averaging buffer
         cep_buffer = []
-
         for i in range(n_frames):
-            start = i * self.hop_len
-            frame = audio[start:start + self.n_fft]
-            windowed = frame * self.window
-            fft_vals = np.fft.rfft(windowed, n=self.n_fft)
-            mag_full = np.abs(fft_vals)
-            mag_band = mag_full[self.freq_idx].astype(np.float32)
-
-            # Log magnitude (primary ML channel)
-            log_band = np.log(mag_band + 1e-12).astype(np.float32)
-            log_mag_band_seq[i] = log_band
-
-            # SMD: std of mean-removed log spectrum
-            centered = log_band - log_band.mean()
+            w = log_mag_preprocessed[i].astype(np.float64)
+            centered = w - w.mean()
             smd_seq[i] = float(np.std(centered))
 
-            # Cepstrum for CPR/CPN (with averaging)
-            cep_frame = np.abs(np.fft.fft(centered.astype(np.float64)))
+            cep_frame = np.abs(np.fft.fft(centered))
             cep_buffer.append(cep_frame)
             if len(cep_buffer) > self.cep_avg_frames:
                 cep_buffer.pop(0)
@@ -299,28 +330,23 @@ class OfflineOmegaFeatureExtractor:
             cpr_seq[i] = cpr_val
             cpn_seq[i] = cpn_val
 
-            # Energy and SNR proxies
-            rms = float(np.sqrt(np.mean(frame ** 2) + 1e-12))
+            rms = float(np.sqrt(np.mean(frames_raw[i] ** 2) + 1e-12))
             energy_proxy_seq[i] = rms
             snr_proxy_seq[i] = float(
-                20.0 * np.log10((np.max(mag_band) + 1e-8) / (np.mean(mag_band) + 1e-8))
+                20.0 * np.log10((np.max(mag_band[i]) + 1e-8) / (np.mean(mag_band[i]) + 1e-8))
             )
-            frame_time_sec[i] = float(i) * self.hop_sec
 
-        # Derive multi-channel temporal differences from log_mag_band
-        log_mag_band_dt1 = _temporal_difference(log_mag_band_seq, lag=self.dt_short_lag)
-        log_mag_band_dt_long = _temporal_difference(log_mag_band_seq, lag=self.dt_long_lag)
-        log_mag_band_abs_dt1 = np.abs(log_mag_band_dt1)
+        frame_time_sec = (np.arange(n_frames, dtype=np.float32) * self.hop_sec).astype(np.float32)
 
         labels = self._frame_labels(frame_time_sec, optional_labels)
         return {
             "schema_version": np.asarray([OMEGA_CACHE_SCHEMA_VERSION], dtype=np.int64),
             "frame_time_sec": frame_time_sec,
             # Primary ML channels [T, F]
-            "log_mag_band": log_mag_band_seq,
-            "log_mag_band_dt1": log_mag_band_dt1,
-            "log_mag_band_dt_long": log_mag_band_dt_long,
-            "log_mag_band_abs_dt1": log_mag_band_abs_dt1,
+            "log_mag_band": log_mag_band_raw,
+            "log_mag_preprocessed": log_mag_preprocessed,
+            "log_mag_preprocessed_dt1": log_mag_preprocessed_dt1,
+            "log_mag_preprocessed_abs": log_mag_preprocessed_abs,
             # Per-frame cepstral scalars [T]
             "smd": smd_seq,
             "cpr": cpr_seq,

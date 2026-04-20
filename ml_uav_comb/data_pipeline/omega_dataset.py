@@ -172,8 +172,8 @@ class OmegaWindowDataset(Dataset):
             return self.cache_store[cache_path]
         cache = dict(np.load(cache_path, allow_pickle=True))
         version = int(np.asarray(cache["schema_version"]).reshape(-1)[0])
-        if version not in (6,):
-            raise ValueError(f"expected omega cache schema_version 6, got {version} for {cache_path}")
+        if version not in (7,):
+            raise ValueError(f"expected omega cache schema_version 7, got {version} for {cache_path}")
         _ensure_pattern_targets(cache)
         if self.max_cache_files > 0:
             self.cache_store[cache_path] = cache
@@ -253,8 +253,6 @@ class OmegaWindowDatasetView(Dataset):
         self.max_cache_files = int(base_dataset.max_cache_files)
         self.cache_store = base_dataset.cache_store
         self.norm_stats = base_dataset.norm_stats
-        self.norm_mean = base_dataset.norm_mean
-        self.norm_std = base_dataset.norm_std
         self.channel_norm = base_dataset.channel_norm
         self.num_input_channels = base_dataset.num_input_channels
         self.recording_entries = base_dataset.recording_entries
