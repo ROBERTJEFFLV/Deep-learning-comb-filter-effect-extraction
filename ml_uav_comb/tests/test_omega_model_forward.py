@@ -12,7 +12,8 @@ class TestOmegaModelForward(unittest.TestCase):
     def test_forward_returns_minimal_dual_head_outputs(self) -> None:
         cfg = load_yaml_config("ml_uav_comb/configs/omega_tiny_debug.yaml")
         model = UAVCombOmegaNet(cfg)
-        batch = {"x": torch.randn(2, 1, 68, 43)}
+        num_freq_bins = int(model.frequency_bins_hz.shape[0])
+        batch = {"x": torch.randn(2, 4, 68, num_freq_bins)}
 
         pred = model(batch)
         self.assertIn("omega_pred", pred)
@@ -31,17 +32,10 @@ class TestOmegaModelForward(unittest.TestCase):
     def test_forward_debug_exposes_frequency_pool_details(self) -> None:
         cfg = load_yaml_config("ml_uav_comb/configs/omega_tiny_debug.yaml")
         model = UAVCombOmegaNet(cfg)
-        pred = model({"x": torch.randn(2, 1, 68, 43)}, return_debug=True)
-        self.assertIn("frequency_pool_weights", pred)
-        self.assertIn("pooled_frequency_hz", pred)
-        self.assertEqual(pred["pooled_frequency_hz"].shape[:2], (2, 68))
-        self.assertTrue(
-            torch.allclose(
-                pred["frequency_pool_weights"].sum(dim=-1),
-                torch.ones_like(pred["frequency_pool_weights"].sum(dim=-1)),
-                atol=1e-5,
-            )
-        )
+        num_freq_bins = int(model.frequency_bins_hz.shape[0])
+        pred = model({"x": torch.randn(2, 4, 68, num_freq_bins)}, return_debug=True)
+        self.assertIn("cross_freq_attention_weights", pred)
+        self.assertIn("per_bin_feature_map", pred)
 
 
 if __name__ == "__main__":

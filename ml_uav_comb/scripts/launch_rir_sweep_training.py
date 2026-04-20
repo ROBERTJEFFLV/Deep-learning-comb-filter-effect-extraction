@@ -65,16 +65,41 @@ def _build_recordings_list(
                 "split_hint": split,
             }
         )
-    for _, row in real_manifest.iterrows():
-        recordings.append(
-            {
-                "recording_id": str(row["run_id"]),
-                "audio_path": str(row["output_wav"]),
-                "label_path": str(row["labels_csv"]),
-                "label_format": "csv",
+    # Original real test recordings are replaced by segmented versions.
+    # real_manifest entries are no longer used directly.
+    # Instead, load segmented real recordings from cache/real_segment_info.json
+    seg_info_path = os.path.join(CACHE_DIR, "real_segment_info.json")
+    if os.path.exists(seg_info_path):
+        with open(seg_info_path) as f:
+            seg_info = json.load(f)
+        # Real-train segments (code 20000+): mixed into train/val pool
+        for code in seg_info["train_recording_codes"]:
+            recordings.append({
+                "recording_id": f"real_train_{code - 20000:05d}",
+                "split_hint": "train",
+                "is_real_segment": True,
+            })
+        # Real-test segments (code 30000+): fixed test set
+        for code in seg_info["test_recording_codes"]:
+            recordings.append({
+                "recording_id": f"real_test_seg_{code - 30000:05d}",
                 "split_hint": "test",
-            }
-        )
+                "is_real_segment": True,
+            })
+        print(f"  Added {len(seg_info['train_recording_codes'])} real-train + "
+              f"{len(seg_info['test_recording_codes'])} real-test segments")
+    else:
+        # Fallback: use original real manifest as before
+        for _, row in real_manifest.iterrows():
+            recordings.append(
+                {
+                    "recording_id": str(row["run_id"]),
+                    "audio_path": str(row["output_wav"]),
+                    "label_path": str(row["labels_csv"]),
+                    "label_format": "csv",
+                    "split_hint": "test",
+                }
+            )
     return recordings
 
 
@@ -118,11 +143,14 @@ def _build_config(args) -> dict:
     cfg["training"]["num_workers"] = args.num_workers
     cfg["training"]["log_interval_steps"] = 50
     cfg["training"]["use_compile"] = not args.no_compile
+    cfg["training"]["max_train_steps_per_epoch"] = args.max_train_steps
+    cfg["training"]["max_eval_batches"] = args.max_eval_batches
+    cfg["training"]["test_eval_frequency"] = args.test_eval_freq
 
-    # Loss rebalancing: smooth_l1 replaces huber (see omega_losses.py),
-    # so omega_loss magnitude is now ~0.003 instead of ~1e-6.
-    # lambda_omega=7 brings omega contribution (~0.021) on par with pattern BCE (~0.02).
-    cfg["training"]["lambda_omega"] = 7.0
+    # Loss rebalancing v2: observability normalized to [0,1], omega as primary objective.
+    # lambda_omega=15 brings omega contribution to ~35-40% of total loss.
+    # lambda_observability=0.3 with normalized target → obs ~10-15% of total.
+    cfg["training"]["lambda_omega"] = 15.0
     cfg["training"]["lambda_delta"] = 1.4
     cfg["training"]["lambda_acc"] = 0.35
     cfg["training"]["lambda_pattern"] = 1.0
@@ -130,6 +158,29 @@ def _build_config(args) -> dict:
     # Down-weight positives to balance: (1 - 0.964) / 0.964 ≈ 0.037.
     # This makes the effective contribution of positives and negatives equal.
     cfg["training"]["pattern_pos_weight"] = 0.037
+
+    # Model v2: Dilated TCN per-bin encoder + multi-head cross-freq fusion
+    cfg["model"]["input_channels"] = args.input_channels
+    cfg["model"]["per_bin_encoder_type"] = "tcn"
+    cfg["model"]["per_bin_tcn_hidden"] = 64
+    cfg["model"]["per_bin_tcn_dilations"] = [1, 2, 8, 16]
+    cfg["model"]["per_bin_tcn_kernel"] = 3
+    cfg["model"]["per_bin_tcn_dropout"] = 0.1
+    cfg["model"]["cross_freq_hidden"] = 64
+    cfg["model"]["cross_freq_heads"] = 4
+    # TemporalStateAggregator disabled: causes 150x gradient attenuation
+    cfg["model"]["use_temporal_state"] = False
+    cfg["model"]["regression_hidden"] = 256
+
+    # Phase 2/3 loss lambdas
+    cfg["training"]["lambda_cross_freq"] = 0.1
+    cfg["training"]["lambda_observability"] = 0.2
+    cfg["training"]["lambda_uncertainty"] = 0.05
+
+    # LR scheduler: cosine annealing with linear warmup
+    cfg["training"]["lr_scheduler"] = "cosine_warmup"
+    cfg["training"]["lr_warmup_epochs"] = 3
+    cfg["training"]["lr_min"] = 1e-5
 
     cfg["evaluation"]["prediction_csv"] = os.path.join(
         CHECKPOINT_DIR, "eval_predictions.csv"
@@ -424,6 +475,14 @@ def main():
                         help="Skip .npz cache export, rebuild only index + normalization")
     parser.add_argument("--no-compile", action="store_true",
                         help="Disable torch.compile (saves ~2x VRAM from CUDA graphs)")
+    parser.add_argument("--input-channels", type=int, default=4,
+                        help="Number of input channels (4=log_mag_band+dt1+dt_long+abs_dt1)")
+    parser.add_argument("--max-train-steps", type=int, default=0,
+                        help="Max training steps per epoch (0=unlimited)")
+    parser.add_argument("--max-eval-batches", type=int, default=0,
+                        help="Max eval batches for train/val (0=unlimited)")
+    parser.add_argument("--test-eval-freq", type=int, default=5,
+                        help="Run test evaluation every N epochs (default: 5)")
     parser.add_argument("--resume-from", default=None)
     parser.add_argument("--dry-run", action="store_true",
                         help="Only run checks, don't train")

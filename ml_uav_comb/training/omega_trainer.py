@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import random
 import resource
 import shutil
@@ -416,12 +417,28 @@ def _format_host_memory_stats(stats: Dict[str, float]) -> str:
     return " ".join(parts) if parts else "host_mem=na"
 
 
-def _evaluate_epoch(model: torch.nn.Module, loader: DataLoader, device: torch.device, cfg: Dict[str, Any]) -> Dict[str, float]:
+def _evaluate_epoch(
+    model: torch.nn.Module,
+    loader: DataLoader,
+    device: torch.device,
+    cfg: Dict[str, Any],
+    *,
+    max_batches_override: int = -1,
+) -> Dict[str, float]:
+    """Evaluate model on a data loader.
+
+    Args:
+        max_batches_override: If >= 0, override max_eval_batches from config.
+            Use 0 to evaluate ALL batches (no limit).
+    """
     model.eval()
     if len(loader.dataset) == 0:
         return {}
     metric_list: List[Dict[str, float]] = []
-    max_eval_batches = max(0, int(cfg["training"].get("max_eval_batches", 0)))
+    if max_batches_override >= 0:
+        max_eval_batches = max_batches_override
+    else:
+        max_eval_batches = max(0, int(cfg["training"].get("max_eval_batches", 0)))
     with torch.inference_mode():
         for batch_idx, batch in enumerate(loader):
             batch = _move_batch(batch, device, bool(cfg["training"].get("non_blocking_to_device", True)))
@@ -436,6 +453,9 @@ def _evaluate_epoch(model: torch.nn.Module, loader: DataLoader, device: torch.de
                     pattern_logit=out["pattern_logit"],
                     pattern_target=batch["pattern_target"],
                     pattern_weights=compute_pattern_weights(batch),
+                    observability_score=batch.get("observability_score"),
+                    observability_pred=out.get("observability_pred"),
+                    distance_cm=batch.get("distance_cm"),
                 )
             )
             if max_eval_batches > 0 and (batch_idx + 1) >= max_eval_batches:
@@ -468,6 +488,24 @@ def train_model(cfg: Dict[str, Any], resume_from: Optional[str] = None) -> Dict[
     )
     scaler = torch.cuda.amp.GradScaler(enabled=use_amp and amp_dtype == torch.float16)
 
+    # LR scheduler: cosine annealing with linear warmup
+    scheduler = None
+    scheduler_type = cfg["training"].get("lr_scheduler", "none")
+    if scheduler_type == "cosine_warmup":
+        warmup_epochs = int(cfg["training"].get("lr_warmup_epochs", 3))
+        lr_min = float(cfg["training"].get("lr_min", 1e-5))
+        lr_base = float(cfg["training"].get("learning_rate", 1e-3))
+
+        def _lr_lambda(epoch: int) -> float:
+            if epoch < warmup_epochs:
+                return max(lr_min / lr_base, (epoch + 1) / warmup_epochs)
+            progress = (epoch - warmup_epochs) / max(1, epochs - warmup_epochs)
+            cosine_decay = 0.5 * (1.0 + math.cos(math.pi * progress))
+            return max(lr_min / lr_base, cosine_decay)
+
+        scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=_lr_lambda)
+        _log(f"lr scheduler | cosine_warmup warmup={warmup_epochs} lr_min={lr_min}")
+
     checkpoint_dir = Path(cfg["training"]["checkpoint_dir"])
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     best_path = checkpoint_dir / "best.pt"
@@ -483,6 +521,8 @@ def train_model(cfg: Dict[str, Any], resume_from: Optional[str] = None) -> Dict[
         optimizer.load_state_dict(state["optimizer_state"])
         if "scaler_state" in state and scaler.is_enabled():
             scaler.load_state_dict(state["scaler_state"])
+        if scheduler is not None and "scheduler_state" in state and state["scheduler_state"] is not None:
+            scheduler.load_state_dict(state["scheduler_state"])
         start_epoch = int(state.get("epoch", 0)) + 1
         best_val = float(state.get("best_val_distance_mae_cm", float("inf")))
 
@@ -560,6 +600,9 @@ def train_model(cfg: Dict[str, Any], resume_from: Optional[str] = None) -> Dict[
                 pattern_logit=out["pattern_logit"].detach(),
                 pattern_target=batch["pattern_target"],
                 pattern_weights=losses["pattern_weights"],
+                observability_score=batch.get("observability_score"),
+                observability_pred=out.get("observability_pred", torch.Tensor()).detach() if "observability_pred" in out else None,
+                distance_cm=batch.get("distance_cm"),
             )
             metric.update(
                 {
@@ -570,6 +613,9 @@ def train_model(cfg: Dict[str, Any], resume_from: Optional[str] = None) -> Dict[
                     "loss_velocity": float(losses["loss_velocity"].item()),
                     "loss_acceleration": float(losses["loss_acceleration"].item()),
                     "loss_dynamic": float(losses["loss_dynamic"].item()),
+                    "loss_cross_freq": float(losses.get("loss_cross_freq", torch.tensor(0.0)).item()),
+                    "loss_observability": float(losses.get("loss_observability", torch.tensor(0.0)).item()),
+                    "loss_uncertainty": float(losses.get("loss_uncertainty", torch.tensor(0.0)).item()),
                 }
             )
             metric_list.append(metric)
@@ -590,6 +636,9 @@ def train_model(cfg: Dict[str, Any], resume_from: Optional[str] = None) -> Dict[
                     f"pattern_loss={metric.get('loss_pattern', 0.0):.6f} "
                     f"delta_omega_loss={metric['loss_velocity']:.3e} "
                     f"acc_omega_loss={metric['loss_acceleration']:.3e} "
+                    f"cf={metric.get('loss_cross_freq', 0.0):.3e} "
+                    f"obs={metric.get('loss_observability', 0.0):.3e} "
+                    f"unc={metric.get('loss_uncertainty', 0.0):.3e} "
                     f"data_wait={data_wait_sec:.3f}s step={step_sec:.3f}s eta={eta_min:.1f}m "
                     f"{_format_gpu_stats(gpu_stats)} {_format_host_memory_stats(host_stats)}"
                 )
@@ -598,10 +647,30 @@ def train_model(cfg: Dict[str, Any], resume_from: Optional[str] = None) -> Dict[
 
         train_metrics = reduce_metric_list(metric_list)
         val_metrics = _evaluate_epoch(model, val_loader, device, cfg)
+
+        # Periodic test evaluation (every N epochs or last epoch)
+        test_eval_freq = max(1, int(cfg["training"].get("test_eval_frequency", 10)))
+        test_metrics: Dict[str, float] = {}
+        is_last_epoch = (epoch == epochs - 1)
+        if test_loader is not None and (epoch % test_eval_freq == 0 or is_last_epoch):
+            if device.type == "cuda":
+                torch.cuda.empty_cache()
+            # No batch limit for test — evaluate ALL test data
+            test_metrics = _evaluate_epoch(model, test_loader, device, cfg, max_batches_override=0)
+            _log(
+                f"epoch {epoch:03d} test | "
+                f"test_dist_mae={test_metrics.get('distance_mae_cm', 0.0):.3f}cm "
+                f"test_dist_mae_all={test_metrics.get('distance_mae_cm_all', 0.0):.3f}cm "
+                f"test_valid_ratio={test_metrics.get('valid_ratio', 0.0):.4f} "
+                f"n_valid={test_metrics.get('_n_valid', 0):.0f} "
+                f"n_all_valid={test_metrics.get('_n_all_valid', 0):.0f}"
+            )
+
         summary = {
             "epoch": int(epoch),
             **{f"train/{k}": v for k, v in train_metrics.items()},
             **{f"val/{k}": v for k, v in val_metrics.items()},
+            **{f"test/{k}": v for k, v in test_metrics.items()},
         }
         history.append(summary)
         state = {
@@ -609,6 +678,7 @@ def train_model(cfg: Dict[str, Any], resume_from: Optional[str] = None) -> Dict[
             "model_state": base_model.state_dict(),
             "optimizer_state": optimizer.state_dict(),
             "scaler_state": scaler.state_dict() if scaler.is_enabled() else None,
+            "scheduler_state": scheduler.state_dict() if scheduler is not None else None,
             "best_val_distance_mae_cm": best_val,
             "history": history,
             "config": cfg,
@@ -624,7 +694,12 @@ def train_model(cfg: Dict[str, Any], resume_from: Optional[str] = None) -> Dict[
             f"epoch {epoch:03d} done | "
             f"train_dist_mae={train_metrics.get('distance_mae_cm', 0.0):.3f}cm "
             f"val_dist_mae={val_metrics.get('distance_mae_cm', 0.0):.3f}cm"
+            + (f" lr={scheduler.get_last_lr()[0]:.2e}" if scheduler is not None else "")
         )
+
+        # Step LR scheduler after epoch logging
+        if scheduler is not None:
+            scheduler.step()
 
     history_path.write_text(json.dumps(history, indent=2), encoding="utf-8")
     final_test_metrics: Dict[str, float] = {}
@@ -640,11 +715,16 @@ def train_model(cfg: Dict[str, Any], resume_from: Optional[str] = None) -> Dict[
             test_loader = create_dataloader(cfg, "test")
         if device.type == "cuda":
             torch.cuda.empty_cache()
-        final_test_metrics = _evaluate_epoch(model, test_loader, device, cfg)
+        # No batch limit for final test — evaluate ALL test data
+        final_test_metrics = _evaluate_epoch(model, test_loader, device, cfg, max_batches_override=0)
         if final_test_metrics:
             _log(
                 f"final test | best_epoch={best_epoch:03d} "
-                f"test_dist_mae={final_test_metrics.get('distance_mae_cm', 0.0):.3f}cm"
+                f"test_dist_mae={final_test_metrics.get('distance_mae_cm', 0.0):.3f}cm "
+                f"test_dist_mae_all={final_test_metrics.get('distance_mae_cm_all', 0.0):.3f}cm "
+                f"test_valid_ratio={final_test_metrics.get('valid_ratio', 0.0):.4f} "
+                f"n_valid={final_test_metrics.get('_n_valid', 0):.0f} "
+                f"n_all_valid={final_test_metrics.get('_n_all_valid', 0):.0f}"
             )
     return {
         "device": str(device),
@@ -687,6 +767,9 @@ def evaluate_model(
                     pattern_logit=out["pattern_logit"],
                     pattern_target=batch["pattern_target"],
                     pattern_weights=pattern_weights,
+                    observability_score=batch.get("observability_score"),
+                    observability_pred=out.get("observability_pred"),
+                    distance_cm=batch.get("distance_cm"),
                 )
             )
             pred_omega_tensor = out["omega_pred"].detach().float()
@@ -703,6 +786,9 @@ def evaluate_model(
             weight_np = regression_weights.detach().cpu().numpy()
             pattern_weight_np = pattern_weights.detach().cpu().numpy()
             seq_index = batch["sequence_index"].detach().cpu().numpy()
+            obs_score_np = batch["observability_score"].detach().cpu().numpy() if "observability_score" in batch else np.full_like(pred_omega, np.nan)
+            obs_pred_np = out["observability_pred"].detach().float().cpu().numpy() if "observability_pred" in out else np.full_like(pred_omega, np.nan)
+            log_var_np = out["log_variance"].detach().float().cpu().numpy() if "log_variance" in out else np.full_like(pred_omega, np.nan)
             for i in range(len(pred_omega)):
                 rows.append(
                     {
@@ -720,6 +806,9 @@ def evaluate_model(
                         "pattern_target": float(target_pattern[i]),
                         "sample_weight": float(weight_np[i]),
                         "pattern_sample_weight": float(pattern_weight_np[i]),
+                        "observability_score": float(obs_score_np[i]),
+                        "observability_pred": float(obs_pred_np[i]),
+                        "log_variance": float(log_var_np[i]),
                     }
                 )
     if output_csv is not None and rows:

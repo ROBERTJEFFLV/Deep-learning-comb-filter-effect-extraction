@@ -42,15 +42,26 @@ else:
     amp_dtype = torch.float16
 model.eval(); torch.set_num_threads(1)
 window_frames = int(cfg['dataset'].get('window_frames', 68)); stride_frames = int(cfg['dataset'].get('stride_frames', 1))
-mean = norm['smooth_d1_mean'].reshape(1, -1); std = norm['smooth_d1_std'].reshape(1, -1)
+from ml_uav_comb.data_pipeline.omega_normalization import DYNAMIC_CHANNEL_KEYS
+channel_norm = []
+for ch_key in DYNAMIC_CHANNEL_KEYS:
+    mk, sk = f"{ch_key}_mean", f"{ch_key}_std"
+    if mk in norm and sk in norm:
+        channel_norm.append((ch_key, norm[mk].reshape(1, -1), norm[sk].reshape(1, -1)))
+if not channel_norm:
+    raise RuntimeError("no normalized channels found in normalization stats")
 pattern_threshold = float(cfg.get('inference', {}).get('pattern_threshold', 0.5))
 rows=[]
 with torch.inference_mode():
     for start in range(0, int(cache['frame_time_sec'].shape[0]) - window_frames + 1, stride_frames):
         end = start + window_frames; target = end - 1
-        x = ((cache['smooth_d1'][start:end] - mean) / std).astype(np.float32)
+        channels = []
+        for ch_key, ch_mean, ch_std in channel_norm:
+            ch_data = ((cache[ch_key][start:end] - ch_mean) / ch_std).astype(np.float32)
+            channels.append(ch_data)
+        x = np.stack(channels, axis=0)  # [C, T, F]
         with torch.autocast(device_type='cuda', dtype=amp_dtype) if use_amp else nullcontext():
-            out = model({"x": torch.from_numpy(x[None, None, :, :]).to(device)})
+            out = model({"x": torch.from_numpy(x[None]).to(device)})
         omega_pred = float(out['omega_pred'].item())
         pattern_prob = float(out['pattern_prob'].item())
         pattern_pred = float(pattern_prob >= pattern_threshold)

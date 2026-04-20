@@ -1,90 +1,98 @@
-# src/ui/visualization_with_record.py
+# ui/visualization.py
+# -*- coding: utf-8 -*-
+"""
+实时可视化 — 基于梳状滤波器 v2 特征的 Pygame 显示
+
+显示内容:
+  左半区: 频谱曲线 (800-8000 Hz)
+  右半区: SMD 时间序列 + 检测状态 + 距离估计
+  底部: 数值面板 (SMD / CPR / CPN / distance / velocity)
+
+CSV 记录列:
+  time_sec, smd, cpr, cpn, nda, obstacle, distance_raw_cm, distance_kf_cm
+"""
 
 import pygame
 from queue import Empty, Queue
 import csv
-from config import WIDTH, HEIGHT, FPS, DRAW_STEP, FREQ_MIN, FREQ_MAX, HOP_LEN, SR
-
 import numpy as np
 
-def safe_fmt(val, fmt=".1f"):
-    return f"{val:{fmt}}" if isinstance(val, (int, float)) else "None"
+from config import (
+    WIDTH, HEIGHT, FPS, DRAW_STEP,
+    COMB_V2_FREQ_MIN, COMB_V2_FREQ_MAX,
+    COMB_V2_HOP, COMB_V2_SMD_THRESHOLD, SR,
+)
+
+
+def safe_fmt(val, fmt=".2f"):
+    return f"{val:{fmt}}" if isinstance(val, (int, float)) else "—"
 
 
 class Visualization:
-    def __init__(self, frame_q: Queue, freq_bins: list, running_flag_fn):
-        self.q          = frame_q
-        self.bins       = freq_bins
-        self.running    = running_flag_fn
-        self.sel_freqs  = np.array([fb.freq for fb in freq_bins])
+    # SMD 历史记录长度（绘制时间序列用）
+    SMD_HISTORY_LEN = 300
 
-        # —— 颜色 ——  
+    def __init__(self, frame_q: Queue, running_flag_fn):
+        self.q = frame_q
+        self.running = running_flag_fn
+
+        # 颜色
         self.BLACK  = (0,   0,   0)
         self.WHITE  = (255, 255, 255)
-        self.RED    = (255, 0,   0)
-        self.BLUE   = (0,   0,   255)
-        self.GREEN  = (0,   255, 0)
-        self.GRAY   = (200, 200, 200)
-        self.YELLOW = (255, 255, 0)
+        self.RED    = (255, 50,  50)
+        self.GREEN  = (50,  255, 50)
+        self.BLUE   = (80,  140, 255)
+        self.GRAY   = (120, 120, 120)
+        self.YELLOW = (255, 220, 50)
+        self.CYAN   = (0,   220, 220)
+        self.DARK_GREEN = (0, 100, 0)
 
-        # —— 频谱绘图区宽度 ——  
-        self.spectrum_width = WIDTH // 2 - 100
+        # 布局
+        self.SPEC_X = 80
+        self.SPEC_Y = 60
+        self.SPEC_W = WIDTH // 2 - 120
+        self.SPEC_H = HEIGHT // 2 - 80
 
-        # —— 第一组柱状图参数（d1） ——  
-        self.CHART1_WIDTH   = 800
-        self.BARS1_X        = 200 + self.spectrum_width
-        self.BARS1_Y        = 100
-        self.BARS1_H        = (HEIGHT - 500) // 2
-        self.spacing        = 2
-        self.BAR_WIDTH      = max(
-            2,
-            (self.CHART1_WIDTH - (len(self.bins) + 1) * self.spacing)
-            // len(self.bins)
-        )
-        self.BAR1_MAX_H     = self.BARS1_H // 2 - 50
-        self.AMP_SCALE1     = 900
+        self.SMD_X = WIDTH // 2 + 40
+        self.SMD_Y = 60
+        self.SMD_W = WIDTH // 2 - 120
+        self.SMD_H = HEIGHT // 2 - 80
 
-        # —— 第二组柱状图（原先保留位，不再使用 d2） ——  
-        self.CHART2_WIDTH   = 800
-        self.BARS2_X        = self.BARS1_X
-        self.BARS2_Y        = 600
-        self.BARS2_H        = (HEIGHT - 500) // 2
-        self.BAR2_MAX_H     = self.BARS2_H // 2 - 50
-        self.AMP_SCALE2     = 20000
+        self.INFO_Y = HEIGHT // 2 + 40
 
-        # —— CSV 记录（改为记录 direction / distance / omega / A / rmse / r2） —— 
-        self.csv_file   = open('sine_fit_log.csv', 'w', newline='', buffering=1)  # 行缓冲
+        # SMD 时间序列
+        self.smd_history = []
+
+        # CSV
+        self.csv_file = open('comb_v2_log.csv', 'w', newline='', buffering=1)
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_writer.writerow([
-            'time_sec', 'is_sound_present', 'direction', 'distance_cm',
-            'omega_rad_per_Hz', 'A', 'rmse', 'r2'
+            'time_sec', 'smd', 'cpr', 'cpn', 'nda',
+            'obstacle', 'distance_raw_cm', 'distance_kf_cm',
         ])
-        self.csv_file.flush()  # 立即写入表头
+        self.csv_file.flush()
 
-        # 定期刷盘计数器
         self._flush_counter = 0
-        self._flush_interval = 10  # 每10帧刷盘一次
+        self._flush_interval = 10
 
-        # —— 时间戳 —— 
-        self.hop_sec    = HOP_LEN / SR
+        self.hop_sec = COMB_V2_HOP / SR
+        self.frame_count = 0
 
-        # —— 运行状态 ——  
-        self.last_distance = None    # 如果需要在方向保持时沿用上一距离
-        self.frame_count   = 0
-
-        # —— 字体 ——  
+        # 字体（pygame.init() 后设置）
         self.label_font = None
         self.score_font = None
+        self.title_font = None
 
     def start(self):
         pygame.init()
         pygame.font.init()
 
         self.label_font = pygame.font.Font(None, 24)
-        self.score_font = pygame.font.Font(None, 48)
+        self.score_font = pygame.font.Font(None, 44)
+        self.title_font = pygame.font.Font(None, 32)
 
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        pygame.display.set_caption("实时音频处理与抽样绘图")
+        pygame.display.set_caption("Comb Filter v2 — 实时梳状滤波器特征检测")
         self.clock = pygame.time.Clock()
         try:
             self._main_loop()
@@ -94,165 +102,215 @@ class Visualization:
             try:
                 self.csv_file.flush()
                 self.csv_file.close()
-                print("[Visualization] CSV 文件已保存")
+                print("[Visualization] CSV 已保存 → comb_v2_log.csv")
             except Exception as e:
                 print(f"[Visualization] CSV 关闭错误: {e}")
             pygame.quit()
 
+    # ------------------------------------------------------------------ #
+    #                          主循环                                     #
+    # ------------------------------------------------------------------ #
     def _main_loop(self):
-        latest_frame = None
+        latest = None
 
         while self.running():
-            # 设置超时，避免无限等待
             for ev in pygame.event.get():
                 if ev.type == pygame.QUIT:
                     self.running(stop=True)
-                    return  # 立即退出
-                # 添加 ESC 键退出
-                if ev.type == pygame.KEYDOWN:
-                    if ev.key == pygame.K_ESCAPE:
-                        self.running(stop=True)
-                        return
+                    return
+                if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
+                    self.running(stop=True)
+                    return
 
-            # —— 取队列最新帧 ——  
+            # 取最新帧
             try:
                 while True:
-                    latest_frame = self.q.get_nowait()
+                    latest = self.q.get_nowait()
             except Empty:
                 pass
 
-            # —— 背景与坐标轴 ——  
             self.screen.fill(self.BLACK)
-            # 频谱底轴
-            pygame.draw.line(
-                self.screen, self.GRAY,
-                (100, HEIGHT - 100),
-                (100 + self.spectrum_width, HEIGHT - 100),
-                2
-            )
-            # 频谱左轴
-            pygame.draw.line(
-                self.screen, self.GRAY,
-                (100, 100),
-                (100, HEIGHT - 100),
-                2
-            )
 
-            if latest_frame:
-                # —— 画频谱曲线 ——  
-                spec = latest_frame['spectrum'][::DRAW_STEP]
-                N = len(spec)
-                for i in range(N - 1):
-                    x1 = 100 + i * self.spectrum_width / N
-                    y1 = int(HEIGHT - 100 - spec[i] * (HEIGHT - 200))
-                    x2 = 100 + (i + 1) * self.spectrum_width / N
-                    y2 = int(HEIGHT - 100 - spec[i + 1] * (HEIGHT - 200))
-                    pygame.draw.line(self.screen, self.WHITE, (x1, y1), (x2, y2), 2)
+            if latest:
+                self._draw_spectrum(latest)
+                self._draw_smd_timeline(latest)
+                self._draw_info_panel(latest)
+                self._write_csv(latest)
 
-                # —— 可选：显示若存在的基频标记（若 audio_processor 未提供可忽略） ——  
-                f0 = latest_frame.get("f0", None)
-                if f0 is not None:
-                    n = 1
-                    while True:
-                        fn = n * f0
-                        if fn > FREQ_MAX:
-                            break
-                        if fn >= FREQ_MIN:
-                            frac = (fn - FREQ_MIN) / (FREQ_MAX - FREQ_MIN)
-                            x = 100 + frac * self.spectrum_width
-                            y_top = 95
-                            pygame.draw.circle(self.screen, self.YELLOW, (int(x), y_top), 5)
-                        n += 1
-
-                # —— 一阶差分柱状图 ——  
-                for idx, bin_obj in enumerate(self.bins):
-                    bar_x = self.BARS1_X + self.spacing + idx * (self.BAR_WIDTH + self.spacing)
-                    diff_val = bin_obj.diff_amp * self.AMP_SCALE1
-                    if diff_val >= 0:
-                        bar_y   = self.BARS1_Y + self.BARS1_H - diff_val
-                        bar_h   = diff_val
-                        color   = self.GREEN
-                        label_y = bar_y - 20
-                    else:
-                        bar_y   = self.BARS1_Y + self.BARS1_H
-                        bar_h   = -diff_val
-                        color   = self.RED
-                        label_y = bar_y + bar_h + 5
-
-                    pygame.draw.rect(self.screen, color, (bar_x, bar_y, self.BAR_WIDTH, bar_h))
-                    txt = self.label_font.render(f"{bin_obj.diff_amp:.2f}", True, self.WHITE)
-                    w, _ = txt.get_size()
-                    self.screen.blit(txt, (bar_x + (self.BAR_WIDTH - w) / 2, label_y))
-
-                # —— 数值与文本 ——  
-                abs_amp         = latest_frame.get('sum_abs_d1', 0.0)
-                t               = latest_frame.get('t', 0.0)
-                is_sound_present= latest_frame.get('is_sound_present', None)
-                direction_d1    = latest_frame.get('direction_d1', None)
-                distance        = latest_frame.get('distance', None)  # 由 audio_processor 的 sine-fit 计算
-                omega           = latest_frame.get('omega', None)
-                A               = latest_frame.get('A', None)
-                rmse            = latest_frame.get('rmse', None)
-                r2              = latest_frame.get('r2', None)
-
-                # 顶部两行信息（幅度/基频可根据需要显示）
-                amp_txt = self.score_font.render(f"Abs Amplitude: {abs_amp:.3f}", True, self.WHITE)
-                self.screen.blit(amp_txt, (self.BARS1_X, self.BARS1_Y + self.BARS1_H + 200))
-
-                # —— 第三行：仅显示 Direction 与 Distance ——  
-                # 如需平滑显示，可在方向保持时沿用上一距离
-                display_distance = None
-
-                if direction_d1 not in ("Left", "Right"):
-                    self.last_distance = None
-                    display_distance = None
-                else:
-                    if distance is not None:
-                        display_distance = distance
-
-
-                line3 = self.score_font.render(
-                    f"Dir: {direction_d1}  Dist: {display_distance:.2f} cm" if display_distance is not None else f"Dir: {direction_d1}  Dist: None",
-                    True, self.WHITE
-                )
-                x_text = self.BARS1_X
-                y0 = self.BARS1_Y + self.BARS1_H + 250
-                self.screen.blit(line3, (x_text, y0))
-
-                # —— CSV 记录（每帧一行，简洁记录当前估计；可按需节流） ——  
-                self.frame_count += 1
-                self._flush_counter += 1
-                # 只有在 display_distance 可用时，才写入这些基于窗口拟合的度量；否则写空字符串（与 distance 的门控保持一致）
-                if display_distance is not None:
-                    self.csv_writer.writerow([
-                        t, is_sound_present, direction_d1, distance,
-                        omega if omega is not None else "", A if A is not None else "",
-                        rmse if rmse is not None else "", r2 if r2 is not None else ""
-                    ])
-                else:
-                    self.csv_writer.writerow([
-                        t, is_sound_present, direction_d1, "",
-                        "", "", "", ""
-                    ])
-                
-                # 定期刷盘（每N帧或每秒）
-                if self._flush_counter >= self._flush_interval:
-                    try:
-                        self.csv_file.flush()
-                        self._flush_counter = 0
-                    except Exception as e:
-                        print(f"[Visualization] CSV flush error: {e}")
-
-            # —— 刷新 & 限帧 ——  
             pygame.display.flip()
             self.clock.tick(FPS)
 
-        # 循环退出后立即刷盘并关闭
-        try:
-            self.csv_file.flush()
-            self.csv_file.close()
-            print("[Visualization] CSV 文件已保存")
-        except Exception as e:
-            print(f"[Visualization] CSV 关闭错误: {e}")
-        
-        pygame.quit()
+    # ------------------------------------------------------------------ #
+    #                     频谱显示 (左半区)                                #
+    # ------------------------------------------------------------------ #
+    def _draw_spectrum(self, frame):
+        spec = frame.get('spectrum')
+        if spec is None or len(spec) == 0:
+            return
+
+        # 坐标轴
+        pygame.draw.line(self.screen, self.GRAY,
+                         (self.SPEC_X, self.SPEC_Y + self.SPEC_H),
+                         (self.SPEC_X + self.SPEC_W, self.SPEC_Y + self.SPEC_H), 1)
+        pygame.draw.line(self.screen, self.GRAY,
+                         (self.SPEC_X, self.SPEC_Y),
+                         (self.SPEC_X, self.SPEC_Y + self.SPEC_H), 1)
+
+        # 标题
+        title = self.title_font.render(
+            f"Spectrum ({int(COMB_V2_FREQ_MIN)}-{int(COMB_V2_FREQ_MAX)} Hz)",
+            True, self.WHITE)
+        self.screen.blit(title, (self.SPEC_X, self.SPEC_Y - 30))
+
+        # 归一化绘制
+        spec_draw = spec[::DRAW_STEP]
+        N = len(spec_draw)
+        if N < 2:
+            return
+        max_val = np.max(spec_draw) if np.max(spec_draw) > 0 else 1.0
+        normed = spec_draw / max_val
+
+        points = []
+        for i in range(N):
+            x = self.SPEC_X + i * self.SPEC_W / N
+            y = self.SPEC_Y + self.SPEC_H - normed[i] * self.SPEC_H * 0.9
+            points.append((int(x), int(y)))
+
+        if len(points) > 1:
+            pygame.draw.lines(self.screen, self.CYAN, False, points, 2)
+
+    # ------------------------------------------------------------------ #
+    #                   SMD 时间序列 (右半区)                               #
+    # ------------------------------------------------------------------ #
+    def _draw_smd_timeline(self, frame):
+        smd = frame.get('smd', 0.0)
+        detected = frame.get('obstacle_detected', False)
+
+        self.smd_history.append((smd, detected))
+        if len(self.smd_history) > self.SMD_HISTORY_LEN:
+            self.smd_history = self.smd_history[-self.SMD_HISTORY_LEN:]
+
+        # 坐标轴
+        pygame.draw.line(self.screen, self.GRAY,
+                         (self.SMD_X, self.SMD_Y + self.SMD_H),
+                         (self.SMD_X + self.SMD_W, self.SMD_Y + self.SMD_H), 1)
+        pygame.draw.line(self.screen, self.GRAY,
+                         (self.SMD_X, self.SMD_Y),
+                         (self.SMD_X, self.SMD_Y + self.SMD_H), 1)
+
+        # 标题
+        status_color = self.GREEN if detected else self.RED
+        status_text = "DETECTED" if detected else "—"
+        title = self.title_font.render("SMD Timeline", True, self.WHITE)
+        self.screen.blit(title, (self.SMD_X, self.SMD_Y - 30))
+        st = self.title_font.render(status_text, True, status_color)
+        self.screen.blit(st, (self.SMD_X + 200, self.SMD_Y - 30))
+
+        # 阈值线
+        thr = COMB_V2_SMD_THRESHOLD
+        smd_max = max(1.5, thr * 1.8)
+        thr_y = self.SMD_Y + self.SMD_H - (thr / smd_max) * self.SMD_H
+        pygame.draw.line(self.screen, self.YELLOW,
+                         (self.SMD_X, int(thr_y)),
+                         (self.SMD_X + self.SMD_W, int(thr_y)), 1)
+        thr_label = self.label_font.render(f"thr={thr:.3f}", True, self.YELLOW)
+        self.screen.blit(thr_label, (self.SMD_X + self.SMD_W + 5, int(thr_y) - 8))
+
+        # 数据点
+        n = len(self.smd_history)
+        if n < 2:
+            return
+        for i in range(1, n):
+            x0 = self.SMD_X + (i - 1) * self.SMD_W / self.SMD_HISTORY_LEN
+            x1 = self.SMD_X + i * self.SMD_W / self.SMD_HISTORY_LEN
+            s0, d0 = self.smd_history[i - 1]
+            s1, d1 = self.smd_history[i]
+            y0 = self.SMD_Y + self.SMD_H - (s0 / smd_max) * self.SMD_H
+            y1 = self.SMD_Y + self.SMD_H - (s1 / smd_max) * self.SMD_H
+            color = self.GREEN if d1 else self.GRAY
+            pygame.draw.line(self.screen, color,
+                             (int(x0), int(y0)), (int(x1), int(y1)), 2)
+
+    # ------------------------------------------------------------------ #
+    #                      数值面板 (下半区)                                #
+    # ------------------------------------------------------------------ #
+    def _draw_info_panel(self, frame):
+        smd = frame.get('smd', 0.0)
+        cpr = frame.get('cpr', 0.0)
+        cpn = frame.get('cpn', 0.0)
+        dist_raw = frame.get('distance_raw')
+        dist_kf = frame.get('distance_kf')
+        vel_kf = frame.get('velocity_kf')
+        detected = frame.get('obstacle_detected', False)
+        t = frame.get('t', 0.0)
+
+        y = self.INFO_Y
+        x_left = self.SPEC_X
+        x_right = WIDTH // 2 + 40
+        line_h = 50
+
+        # 检测状态大字
+        if detected:
+            det_text = "● OBSTACLE DETECTED"
+            det_color = self.GREEN
+        else:
+            det_text = "○ No obstacle"
+            det_color = self.RED
+
+        det_surf = self.score_font.render(det_text, True, det_color)
+        self.screen.blit(det_surf, (x_left, y))
+        y += line_h + 10
+
+        # 特征数值
+        features = [
+            ("SMD", smd, self.GREEN if smd > COMB_V2_SMD_THRESHOLD else self.GRAY),
+            ("CPR", cpr, self.WHITE),
+            ("CPN", cpn, self.WHITE),
+        ]
+        for name, val, color in features:
+            txt = self.score_font.render(f"{name}: {safe_fmt(val, '.4f')}", True, color)
+            self.screen.blit(txt, (x_left, y))
+            y += line_h
+
+        # 距离信息
+        y = self.INFO_Y + line_h + 10
+        dist_lines = [
+            (f"Distance (raw):  {safe_fmt(dist_raw)} cm", self.CYAN),
+            (f"Distance (KF):   {safe_fmt(dist_kf)} cm", self.BLUE),
+            (f"Velocity (KF):   {safe_fmt(vel_kf)} cm/s", self.WHITE),
+            (f"Time: {safe_fmt(t, '.2f')} s", self.GRAY),
+        ]
+        for text, color in dist_lines:
+            surf = self.score_font.render(text, True, color)
+            self.screen.blit(surf, (x_right, y))
+            y += line_h
+
+    # ------------------------------------------------------------------ #
+    #                            CSV 记录                                  #
+    # ------------------------------------------------------------------ #
+    def _write_csv(self, frame):
+        self.frame_count += 1
+        self._flush_counter += 1
+
+        t = frame.get('t', 0.0)
+        smd = frame.get('smd', 0.0)
+        cpr = frame.get('cpr', 0.0)
+        cpn = frame.get('cpn', 0.0)
+        nda = frame.get('nda', 0.0)
+        detected = 1 if frame.get('obstacle_detected', False) else 0
+        dist_raw = frame.get('distance_raw', '')
+        dist_kf = frame.get('distance_kf', '')
+
+        self.csv_writer.writerow([
+            f"{t:.4f}", f"{smd:.6f}", f"{cpr:.4f}", f"{cpn:.4f}",
+            f"{nda:.4f}", detected,
+            f"{dist_raw:.2f}" if isinstance(dist_raw, (int, float)) else "",
+            f"{dist_kf:.2f}" if isinstance(dist_kf, (int, float)) else "",
+        ])
+
+        if self._flush_counter >= self._flush_interval:
+            try:
+                self.csv_file.flush()
+                self._flush_counter = 0
+            except Exception as e:
+                print(f"[Visualization] CSV flush error: {e}")

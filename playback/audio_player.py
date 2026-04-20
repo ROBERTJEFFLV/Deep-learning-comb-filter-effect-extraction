@@ -7,7 +7,7 @@ import sounddevice as sd
 from collections import deque
 from queue import Queue, Full
 from typing import Optional
-from config import SR, HOP_LEN
+from config import SR, PLAYBACK_BLOCKSIZE
 from playback.audio_recorder import AudioRecorder
 
 
@@ -99,11 +99,11 @@ class AudioPlayer:
                         samplerate=SR,
                         channels=1,
                         dtype='int16',
-                        blocksize=HOP_LEN,
+                        blocksize=PLAYBACK_BLOCKSIZE,
                         callback=self._callback,
                         latency='low',
                     ):
-                        print(f"[AudioPlayer] Callback playback started at {SR} Hz, blocksize={HOP_LEN}")
+                        print(f"[AudioPlayer] Callback playback started at {SR} Hz, blocksize={PLAYBACK_BLOCKSIZE}")
                         # 只要 running，就让回调自己触发
                         while self.running():
                             time.sleep(0.1)

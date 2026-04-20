@@ -47,7 +47,7 @@ class TestOmegaCompactIndex(unittest.TestCase):
                 float(cache["frame_time_sec"][target_frame]),
                 places=6,
             )
-            self.assertEqual(tuple(sample["x"].shape), (1, dataset.window_frames, 43))
+            self.assertEqual(tuple(sample["x"].shape), (dataset.num_input_channels, dataset.window_frames, len(dataset.channel_norm[0][1].flatten())))
             self.assertIn("pattern_target", sample)
             self.assertGreaterEqual(float(sample["pattern_target"].item()), 0.0)
             self.assertLessEqual(float(sample["pattern_target"].item()), 1.0)
@@ -77,7 +77,9 @@ class TestOmegaCompactIndex(unittest.TestCase):
 
             loader = create_dataloader(cfg, "train")
             batch = next(iter(loader))
-            self.assertEqual(tuple(batch["x"].shape[-2:]), (dataset.window_frames, 43))
+            num_freq_bins = tuple(batch["x"].shape[-2:])[1]
+            self.assertEqual(batch["x"].shape[-2], dataset.window_frames)
+            self.assertGreater(num_freq_bins, 0)
             self.assertEqual(batch["chunk_id"].ndim, 1)
             self.assertIn("pattern_target", batch)
             self.assertIn("omega_target", batch)

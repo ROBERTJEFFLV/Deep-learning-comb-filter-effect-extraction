@@ -26,23 +26,13 @@ def write_test_wav(path: Path, duration_sec: float, sr: int = 48_000) -> None:
         wf.writeframes(pcm.tobytes())
 
 
-def write_distance_only_labels(path: Path, duration_sec: float) -> None:
-    with open(path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["time_sec", "distance_cm"])
-        writer.writeheader()
-        for t in np.arange(0.0, float(duration_sec) + 1e-6, 0.1, dtype=np.float32):
-            writer.writerow(
-                {
-                    "time_sec": f"{float(t):.3f}",
-                    "distance_cm": f"{100.0 - 5.0 * float(t):.3f}",
-                }
-            )
-
-
 def write_omega_labels(path: Path, duration_sec: float) -> None:
     times = np.arange(0.0, float(duration_sec) + 1e-6, 0.1, dtype=np.float32)
-    distance_cm = 100.0 - 5.0 * times
-    v_perp_mps = np.full_like(times, -0.9, dtype=np.float32)
+    # Use distances within observable range (< 25cm cutoff) and
+    # velocity that passes the empirical observability gate
+    distance_cm = 15.0 - 1.5 * times
+    distance_cm = np.clip(distance_cm, 5.0, 24.0)
+    v_perp_mps = np.full_like(times, 0.5, dtype=np.float32)
     score = resolution_observability_score(distance_cm / 100.0, v_perp_mps).astype(np.float32)
     pattern_label = (score >= 1.0).astype(np.float32)
     with open(path, "w", newline="", encoding="utf-8") as f:
@@ -69,50 +59,6 @@ def write_omega_labels(path: Path, duration_sec: float) -> None:
                     "pattern_label_res": str(int(float(p) >= 0.5)),
                 }
             )
-
-
-def make_tiny_dataset_cfg(
-    tmpdir: str | Path,
-    duration_sec: float,
-    include_unlabeled_recording: bool = True,
-) -> Dict[str, Any]:
-    tmpdir = Path(tmpdir)
-    cfg = load_yaml_config("ml_uav_comb/configs/tiny_debug.yaml")
-    cfg["audio"]["max_duration_sec"] = float(duration_sec)
-    cfg["dataset"]["cache_dir"] = str(tmpdir / "cache")
-    cfg["dataset"]["index_path"] = str(tmpdir / "cache" / "dataset_index.csv")
-    cfg["dataset"]["normalization_path"] = str(tmpdir / "cache" / "normalization_stats.npz")
-    cfg["dataset"]["meta_path"] = str(tmpdir / "cache" / "dataset_index_meta.json")
-
-    labeled_wav = tmpdir / "rec_1.wav"
-    label_csv = tmpdir / "range_1.csv"
-    write_test_wav(labeled_wav, duration_sec=duration_sec)
-    write_distance_only_labels(label_csv, duration_sec=duration_sec)
-
-    recordings = [
-        {
-            "recording_id": "rec_1",
-            "audio_path": str(labeled_wav),
-            "label_path": str(label_csv),
-            "label_format": "csv",
-            "split_hint": "auto",
-        }
-    ]
-    if include_unlabeled_recording:
-        unlabeled_wav = tmpdir / "recorded_audio.wav"
-        write_test_wav(unlabeled_wav, duration_sec=duration_sec)
-        recordings.append(
-            {
-                "recording_id": "recorded_audio",
-                "audio_path": str(unlabeled_wav),
-                "label_path": None,
-                "label_format": None,
-                "split_hint": "exclude",
-            }
-        )
-
-    cfg["dataset"]["recordings"] = recordings
-    return cfg
 
 
 def make_omega_tiny_dataset_cfg(

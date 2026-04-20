@@ -11,7 +11,10 @@ import torch
 from torch.utils.data import Dataset
 
 from ml_uav_comb.data_pipeline.omega_dataset_index import open_omega_index_split
-from ml_uav_comb.data_pipeline.omega_normalization import load_omega_normalization_stats
+from ml_uav_comb.data_pipeline.omega_normalization import (
+    DYNAMIC_CHANNEL_KEYS,
+    load_omega_normalization_stats,
+)
 from ml_uav_comb.features.feature_utils import (
     DEFAULT_PATTERN_SOFT_TARGET_LOWER,
     DEFAULT_PATTERN_SOFT_TARGET_UPPER,
@@ -138,8 +141,19 @@ class OmegaWindowDataset(Dataset):
         self.max_cache_files = max(0, int(max_cache_files))
         self.cache_store: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
         self.norm_stats = load_omega_normalization_stats(self.meta["normalization_path"])
-        self.norm_mean = np.asarray(self.norm_stats["smooth_d1_mean"], dtype=np.float32).reshape(1, -1)
-        self.norm_std = np.asarray(self.norm_stats["smooth_d1_std"], dtype=np.float32).reshape(1, -1)
+
+        # Build per-channel normalization: list of (key, mean[1,F], std[1,F])
+        self.channel_norm: List[Tuple[str, np.ndarray, np.ndarray]] = []
+        for ch_key in DYNAMIC_CHANNEL_KEYS:
+            mean_key = f"{ch_key}_mean"
+            std_key = f"{ch_key}_std"
+            if mean_key in self.norm_stats and std_key in self.norm_stats:
+                m = np.asarray(self.norm_stats[mean_key], dtype=np.float32).reshape(1, -1)
+                s = np.asarray(self.norm_stats[std_key], dtype=np.float32).reshape(1, -1)
+                self.channel_norm.append((ch_key, m, s))
+        if not self.channel_norm:
+            raise RuntimeError("no normalized channels found in normalization stats")
+        self.num_input_channels = len(self.channel_norm)
 
         self.recording_entries = {
             int(entry["recording_code"]): entry for entry in self.index_manifest.get("recordings", [])
@@ -158,8 +172,8 @@ class OmegaWindowDataset(Dataset):
             return self.cache_store[cache_path]
         cache = dict(np.load(cache_path, allow_pickle=True))
         version = int(np.asarray(cache["schema_version"]).reshape(-1)[0])
-        if version != 4:
-            raise ValueError(f"expected omega cache schema_version 4, got {version} for {cache_path}")
+        if version not in (6,):
+            raise ValueError(f"expected omega cache schema_version 6, got {version} for {cache_path}")
         _ensure_pattern_targets(cache)
         if self.max_cache_files > 0:
             self.cache_store[cache_path] = cache
@@ -179,17 +193,32 @@ class OmegaWindowDataset(Dataset):
         end = start + self.window_frames
         target_frame = end - 1
 
-        x = np.asarray(cache["smooth_d1"][start:end], dtype=np.float32)
-        x = ((x - self.norm_mean) / self.norm_std).astype(np.float32, copy=False)
+        # Build multi-channel input [C, T, F]
+        channels = []
+        for ch_key, ch_mean, ch_std in self.channel_norm:
+            ch_data = np.asarray(cache[ch_key][start:end], dtype=np.float32)
+            ch_data = ((ch_data - ch_mean) / ch_std).astype(np.float32, copy=False)
+            channels.append(ch_data)
+        x = np.stack(channels, axis=0)  # [C, T, F]
 
         frame_time_sec = np.asarray(cache["frame_time_sec"], dtype=np.float32)
         omega_target = np.asarray(cache["frame_omega_target"], dtype=np.float32)
         pattern_target = np.asarray(cache["frame_pattern_target"], dtype=np.float32)
+        observability_arr = np.asarray(
+            cache.get("frame_observability_score_res", np.full(omega_target.shape, np.nan, dtype=np.float32)),
+            dtype=np.float32,
+        )
+        distance_cm_arr = np.asarray(
+            cache.get("frame_distance_cm", np.full(omega_target.shape, np.nan, dtype=np.float32)),
+            dtype=np.float32,
+        )
 
         return {
-            "x": torch.from_numpy(x[None, :, :]).float(),
+            "x": torch.from_numpy(x).float(),
             "omega_target": torch.tensor(float(omega_target[target_frame]), dtype=torch.float32),
             "pattern_target": torch.tensor(float(pattern_target[target_frame]), dtype=torch.float32),
+            "observability_score": torch.tensor(float(observability_arr[target_frame]), dtype=torch.float32),
+            "distance_cm": torch.tensor(float(distance_cm_arr[target_frame]), dtype=torch.float32),
             "target_time_sec": torch.tensor(float(frame_time_sec[target_frame]), dtype=torch.float32),
             "sequence_index": torch.tensor(sequence_index, dtype=torch.long),
             "recording_id": str(recording_entry["recording_id"]),
@@ -226,6 +255,8 @@ class OmegaWindowDatasetView(Dataset):
         self.norm_stats = base_dataset.norm_stats
         self.norm_mean = base_dataset.norm_mean
         self.norm_std = base_dataset.norm_std
+        self.channel_norm = base_dataset.channel_norm
+        self.num_input_channels = base_dataset.num_input_channels
         self.recording_entries = base_dataset.recording_entries
         self.recording_code = np.asarray(base_dataset.recording_code[self.indices])
         self.start_frame = np.asarray(base_dataset.start_frame[self.indices])

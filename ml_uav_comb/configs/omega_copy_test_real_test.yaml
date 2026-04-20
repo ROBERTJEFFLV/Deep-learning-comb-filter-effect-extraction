@@ -3,16 +3,19 @@ experiment:
   seed: 7
 audio:
   target_sr: 48000
-  n_fft: 512
-  hop_len: 128
-  freq_min: 1000
-  freq_max: 5000
+  n_fft: 2048
+  hop_len: 512
+  freq_min: 800
+  freq_max: 8000
   max_duration_sec: null
 front_end:
+  dt_short_lag: 1
+  dt_long_lag: 9
   history_frames: 18
-  smooth_sigma_1: 2.2
-  smooth_sigma_2: 30.0
-  noise_gate_smooth: 0.9
+cepstral:
+  tau_min_s: 0.00025
+  tau_max_s: 0.004
+  cep_avg_frames: 4
 observability:
   center_frequency_hz: 3000.0
   score_threshold: 1.0
@@ -426,7 +429,7 @@ dataset:
     split_hint: test
   window_frames: 68
   stride_frames: 1
-  split_margin_sec: 0.1813333333
+  split_margin_sec: 0.7253333333
   split_ratio_single:
   - 0.7
   - 0.15

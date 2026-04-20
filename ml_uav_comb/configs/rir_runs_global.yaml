@@ -3,20 +3,19 @@ experiment:
   seed: 7
 audio:
   target_sr: 48000
-  n_fft: 512
-  hop_len: 128
-  freq_min: 1000
-  freq_max: 5000
+  n_fft: 2048
+  hop_len: 512
+  freq_min: 800
+  freq_max: 8000
   max_duration_sec: null
 front_end:
+  dt_short_lag: 1
+  dt_long_lag: 9
   history_frames: 18
-  smooth_sigma_1: 2.2
-  smooth_sigma_2: 30.0
   d1_amp_scale: 900.0
   sound_threshold: 0.005
   noise_gate_enabled: true
   noise_gate_threshold: 0.01
-  noise_gate_smooth: 0.9
   amp_threshold: 0.25
   sum_abs_smooth_len: 300
   k_compare: 30
@@ -37,6 +36,10 @@ front_end:
   local_radius_segment: 1
   missing_threshold_sec: 1.0
   min_amplitude: 0.25
+cepstral:
+  tau_min_s: 0.00025
+  tau_max_s: 0.004
+  cep_avg_frames: 4
 kf:
   R: 4.0
   sigma_a: 8.0
@@ -33042,7 +33045,7 @@ dataset:
     split_hint: train
   window_sec: 0.64
   stride_sec: 0.0853333333
-  split_margin_sec: 0.64
+  split_margin_sec: 0.7253333333
   split_ratio_single:
   - 0.7
   - 0.15

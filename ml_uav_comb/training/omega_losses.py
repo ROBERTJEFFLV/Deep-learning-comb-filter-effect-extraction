@@ -47,6 +47,55 @@ def weighted_bce_with_logits(
     return (loss * weights[valid]).sum() / torch.clamp(weights[valid].sum(), min=1e-6)
 
 
+def observability_regression_loss(
+    pred_score: torch.Tensor,
+    target_score: torch.Tensor,
+    weights: torch.Tensor,
+) -> torch.Tensor:
+    """Smooth L1 between predicted and ground-truth observability score.
+
+    Targets are normalized to [0,1] by dividing by 10 (observed max ~10.3) to keep
+    loss magnitude comparable to other components without needing extreme lambda tuning.
+    """
+    valid = torch.isfinite(pred_score) & torch.isfinite(target_score) & (weights > 0.0)
+    if not bool(valid.any()):
+        return pred_score.sum() * 0.0
+    # Normalize both pred and target to ~[0,1] range
+    norm_pred = pred_score[valid] / 10.0
+    norm_target = target_score[valid] / 10.0
+    loss = F.smooth_l1_loss(norm_pred, norm_target, reduction="none", beta=0.05)
+    return (loss * weights[valid]).sum() / torch.clamp(weights[valid].sum(), min=1e-6)
+
+
+def uncertainty_aware_omega_loss(
+    omega_pred: torch.Tensor,
+    omega_target: torch.Tensor,
+    log_variance: torch.Tensor,
+    weights: torch.Tensor,
+) -> torch.Tensor:
+    """Heteroscedastic loss: L = 0.5 * exp(-s) * (y - ŷ)^2 + 0.5 * s.
+
+    This learns to predict uncertainty: high s → low confidence, low s → high confidence.
+    The 0.5*s term prevents the model from making s → ∞ to avoid all loss.
+    """
+    valid = (
+        torch.isfinite(omega_pred)
+        & torch.isfinite(omega_target)
+        & torch.isfinite(log_variance)
+        & (weights > 0.0)
+    )
+    if not bool(valid.any()):
+        return omega_pred.sum() * 0.0
+    precision = torch.exp(-log_variance[valid])
+    sq_err = (omega_pred[valid] - omega_target[valid]).square()
+    loss = 0.5 * precision * sq_err + 0.5 * log_variance[valid]
+    # Use softplus to ensure non-negative loss while preserving gradient flow.
+    # Previous clamp(min=0) killed gradients when loss < 0 (which happens when
+    # log_variance is negative and sq_err is small), making this branch untrainable.
+    loss = F.softplus(loss)
+    return (loss * weights[valid]).sum() / torch.clamp(weights[valid].sum(), min=1e-6)
+
+
 def temporal_delta_loss(
     pred: torch.Tensor,
     target: torch.Tensor,
@@ -101,7 +150,7 @@ def combined_omega_loss(model_out: Dict[str, torch.Tensor], batch: Dict[str, tor
         omega_pred,
         omega_target,
         omega_weights,
-        float(cfg["training"].get("omega_huber_delta", 5.495497353218297e-04)),
+        float(cfg["training"].get("omega_huber_delta", 1.099099e-03)),
     )
     delta_omega_loss = temporal_delta_loss(
         omega_pred,
@@ -128,7 +177,38 @@ def combined_omega_loss(model_out: Dict[str, torch.Tensor], batch: Dict[str, tor
     pattern_pos_weight = float(cfg["training"].get("pattern_pos_weight", 1.0))
     dynamic_loss = delta_lambda * delta_omega_loss + acc_lambda * acc_omega_loss
     pattern_loss = weighted_bce_with_logits(pattern_logit, pattern_target, pattern_weights, pos_weight=pattern_pos_weight)
-    total = pattern_lambda * pattern_loss + omega_lambda * omega_loss + dynamic_loss
+
+    # Phase 2: Cross-frequency consistency loss (computed in model forward)
+    cross_freq_loss = model_out.get("cross_freq_consistency", omega_pred.new_tensor(0.0))
+    cross_freq_lambda = float(cfg["training"].get("lambda_cross_freq", 0.1))
+
+    # Phase 2: Observability regression loss
+    obs_lambda = float(cfg["training"].get("lambda_observability", 0.5))
+    obs_target = batch.get("observability_score")
+    if obs_target is not None and "observability_pred" in model_out:
+        obs_loss = observability_regression_loss(
+            model_out["observability_pred"], obs_target, pattern_weights,
+        )
+    else:
+        obs_loss = omega_pred.new_tensor(0.0)
+
+    # Phase 3: Uncertainty-aware omega loss
+    uncertainty_lambda = float(cfg["training"].get("lambda_uncertainty", 0.01))
+    if "log_variance" in model_out:
+        uncertainty_loss = uncertainty_aware_omega_loss(
+            omega_pred, omega_target, model_out["log_variance"], omega_weights,
+        )
+    else:
+        uncertainty_loss = omega_pred.new_tensor(0.0)
+
+    total = (
+        pattern_lambda * pattern_loss
+        + omega_lambda * omega_loss
+        + dynamic_loss
+        + cross_freq_lambda * cross_freq_loss
+        + obs_lambda * obs_loss
+        + uncertainty_lambda * uncertainty_loss
+    )
     return {
         "loss_total": total,
         "loss_distance": omega_loss.detach(),
@@ -138,6 +218,9 @@ def combined_omega_loss(model_out: Dict[str, torch.Tensor], batch: Dict[str, tor
         "loss_acceleration": acc_omega_loss.detach(),
         "loss_dynamic": dynamic_loss.detach(),
         "loss_smooth": dynamic_loss.detach(),
+        "loss_cross_freq": cross_freq_loss.detach(),
+        "loss_observability": obs_loss.detach(),
+        "loss_uncertainty": uncertainty_loss.detach(),
         "sample_weights": omega_weights.detach(),
         "pattern_weights": pattern_weights.detach(),
     }

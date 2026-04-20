@@ -31,15 +31,11 @@ from ml_uav_comb.features.feature_utils import (
 
 def _dataset_build_spec(cfg: Dict[str, Any]) -> Dict[str, Any]:
     return {
-        "feature_contract_version": 4,
+        "feature_contract_version": 6,
         "experiment": {"seed": int(cfg.get("experiment", {}).get("seed", 0))},
         "audio": cfg["audio"],
-        "front_end": {
-            "history_frames": cfg["front_end"]["history_frames"],
-            "smooth_sigma_1": cfg["front_end"]["smooth_sigma_1"],
-            "smooth_sigma_2": cfg["front_end"]["smooth_sigma_2"],
-            "noise_gate_smooth": cfg["front_end"].get("noise_gate_smooth", 0.9),
-        },
+        "front_end": cfg.get("front_end", {}),
+        "cepstral": cfg.get("cepstral", {}),
         "observability": cfg.get("observability", {}),
         "dataset": {
             "recordings": cfg["dataset"]["recordings"],
@@ -57,6 +53,7 @@ def _dataset_build_spec(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "model": {
             "distance_cm_min": cfg["model"]["distance_cm_min"],
             "distance_cm_max": cfg["model"]["distance_cm_max"],
+            "input_channels": cfg["model"].get("input_channels", 4),
         },
     }
 

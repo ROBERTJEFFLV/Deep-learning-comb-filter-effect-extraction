@@ -164,8 +164,8 @@ def _build_recording_split_arrays(
 ) -> Dict[str, Dict[str, np.ndarray]]:
     cache = np.load(cache_path, allow_pickle=True)
     version = int(np.asarray(cache["schema_version"]).reshape(-1)[0])
-    if version != 4:
-        raise ValueError(f"expected omega cache schema_version 4, got {version} for {cache_path}")
+    if version not in (4, 5, 6):
+        raise ValueError(f"expected omega cache schema_version 4, 5, or 6, got {version} for {cache_path}")
 
     frame_time_sec = np.asarray(cache["frame_time_sec"], dtype=np.float32)
     split_names = list(cfg["dataset"]["split_names"])

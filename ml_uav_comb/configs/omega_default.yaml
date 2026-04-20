@@ -4,17 +4,21 @@ experiment:
 
 audio:
   target_sr: 48000
-  n_fft: 512
-  hop_len: 128
-  freq_min: 1000
-  freq_max: 5000
+  n_fft: 2048
+  hop_len: 512
+  freq_min: 800
+  freq_max: 8000
   max_duration_sec: null
 
 front_end:
+  dt_short_lag: 1
+  dt_long_lag: 9
   history_frames: 18
-  smooth_sigma_1: 2.2
-  smooth_sigma_2: 30.0
-  noise_gate_smooth: 0.9
+
+cepstral:
+  tau_min_s: 0.00025
+  tau_max_s: 0.004
+  cep_avg_frames: 4
 
 observability:
   center_frequency_hz: 3000.0
@@ -38,15 +42,22 @@ dataset:
       split_hint: auto
   window_frames: 68
   stride_frames: 1
-  split_margin_sec: 0.1813333333
+  split_margin_sec: 0.7253333333
   split_ratio_single: [0.7, 0.15, 0.15]
   split_names: [train, val, test]
 
 model:
   distance_cm_min: 5.0
   distance_cm_max: 60.0
-  encoder_channels: [32, 64, 128]
+  input_channels: 4
+  per_bin_temporal_channels: [32, 64]
+  cross_freq_hidden: 32
   regression_hidden: 128
+  use_temporal_state: true
+  temporal_state_heads: 4
+  temporal_state_dropout: 0.1
+  # Legacy keys kept for backward compatibility
+  encoder_channels: [32, 64, 128]
   frequency_coord_mode: standardized
   frequency_pool_hidden: 64
 
@@ -80,6 +91,9 @@ training:
   lambda_delta: 0.2
   lambda_acc: 0.05
   lambda_pattern: 1.0
+  lambda_cross_freq: 0.1
+  lambda_observability: 0.5
+  lambda_uncertainty: 0.01
   checkpoint_dir: ml_uav_comb/artifacts/omega_default
 
 evaluation:
