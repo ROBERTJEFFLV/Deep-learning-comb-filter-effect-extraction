@@ -1,0 +1,89 @@
+experiment:
+  name: cepstral_tiny_debug
+  seed: 7
+
+audio:
+  target_sr: 48000
+  n_fft: 2048
+  hop_len: 512
+  freq_min: 800
+  freq_max: 8000
+  max_duration_sec: 6.0
+
+preprocessing:
+  ema_alpha: 0.1
+  diff_dt: 15
+  spectral_sigma: 5.0
+
+cepstral:
+  tau_min_s: 0.00025
+  tau_max_s: 0.004
+  cep_avg_frames: 4
+
+dataset:
+  build_jobs: 1
+  dynamic_epoch_split: false
+  dynamic_epoch_split_ratio: [5, 1, 1]
+  cache_dir: ml_uav_comb/cache/omega_tiny_debug
+  index_path: ml_uav_comb/cache/omega_tiny_debug/dataset_index.json
+  normalization_path: ml_uav_comb/cache/omega_tiny_debug/normalization_stats.npz
+  meta_path: ml_uav_comb/cache/omega_tiny_debug/dataset_index_meta.json
+  recordings:
+    - recording_id: rec_1
+      audio_path: rec_1.wav
+      label_path: range_1.csv
+      label_format: csv
+      split_hint: auto
+  window_frames: 68
+  stride_frames: 2
+  split_margin_sec: 0.7253333333
+  split_ratio_single: [0.7, 0.15, 0.15]
+  split_names: [train, val, test]
+
+model:
+  # Required by dataset builder (cache signature)
+  distance_cm_min: 5.0
+  distance_cm_max: 60.0
+  input_channels: 4
+  use_temporal: true
+  use_normalization: true
+  norm_eps: 1.0e-6
+  q_conv_channels: 8
+  q_proj_dim: 16
+  gru_hidden: 16
+  gru_layers: 1
+  gru_dropout: 0.0
+
+training:
+  sequence_length: 8
+  eval_sequence_length: 8
+  chunk_step: 8
+  eval_chunk_step: 8
+  batch_size: 8
+  eval_batch_size: 8
+  num_workers: 0
+  pin_memory: false
+  persistent_workers: false
+  prefetch_factor: 2
+  non_blocking_to_device: true
+  max_cache_files_per_worker: 1
+  drop_last_train_batch: false
+  log_interval_steps: 5
+  use_amp: false
+  amp_dtype: auto
+  learning_rate: 5.0e-4
+  weight_decay: 1.0e-4
+  lr_scheduler: none
+  epochs: 2
+  grad_clip_norm: 5.0
+  use_class_weights: true
+  label_smoothing: 0.0
+  focal_gamma: 0.0
+  checkpoint_dir: ml_uav_comb/artifacts/cepstral_tiny_debug
+
+evaluation:
+  prediction_csv: ml_uav_comb/artifacts/cepstral_tiny_debug/eval_predictions.csv
+
+inference:
+  prediction_csv: ml_uav_comb/artifacts/cepstral_tiny_debug/infer_predictions.csv
+  pattern_threshold: 0.5
